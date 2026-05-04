@@ -494,12 +494,22 @@ async function handleFollowUpQuestion(event) {
 }
 
 async function loadProducts() {
-  const response = await fetch("products.json");
-
-  if (!response.ok) {
-    throw new Error(`Could not load products.json (${response.status})`);
+  let response;
+  try {
+    // Try online first
+    response = await fetch(
+      "https://easmit60-arch.github.io/PI_AI/resources.json",
+    );
+    if (!response.ok) throw new Error();
+  } catch {
+    // Fallback to offline/local
+    response = await fetch("resources.json");
+    if (!response.ok) {
+      throw new Error(
+        `Could not load resources.json from online or offline (${response.status})`,
+      );
+    }
   }
-
   const data = await response.json();
   appState.products = data.products || [];
 

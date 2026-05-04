@@ -362,15 +362,23 @@
             const loadingMsg = appendMessage('assistant', '', true);
             setStatus('Thinking...', false, true);
 
+            let response;
             try {
-                const response = await fetch('/chat', {
+                response = await fetch('https://easmit60-arch.github.io/PI_AI/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message: text })
                 });
-
+                if (!response.ok) throw new Error();
+            } catch {
+                response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text })
+                });
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                
+            }
+            try {
                 const data = await response.json();
                 loadingMsg.remove();
                 appendMessage('assistant', data.response);
@@ -395,21 +403,25 @@
             const loadingMsg = appendMessage('assistant', '', true);
             setStatus('Running Sherlock search...', false, true);
 
+            let response;
             try {
-                const response = await fetch('/sherlock', {
+                response = await fetch('https://easmit60-arch.github.io/PI_AI/sherlock', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ usernames })
                 });
-
+                if (!response.ok) throw new Error();
+            } catch {
+                response = await fetch('/sherlock', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ usernames })
+                });
+                if (!response.ok) throw new Error('Sherlock request failed');
+            }
+            try {
                 const data = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(data.error || 'Sherlock request failed');
-                }
-
                 loadingMsg.remove();
-                
                 // Format Sherlock results
                 const results = Array.isArray(data.results) 
                     ? data.results.map(r => {
@@ -418,7 +430,6 @@
                         return `<strong>${username}</strong><br>${urls}`;
                     })
                     : [`Results: ${JSON.stringify(data.results).substring(0, 200)}...`];
-
                 appendMessage('assistant', results);
                 setStatus(data.message || 'Sherlock search completed');
             } catch (error) {
