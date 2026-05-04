@@ -259,6 +259,7 @@
     </style>
 </head>
 <body>
+
     <div class="container">
         <div class="header">
             <h1>🌸 PI_AI</h1>
@@ -298,7 +299,20 @@
 
             <div id="status" class="status"></div>
         </div>
-    </div>
+
+        <!-- 404-style fallback section, hidden by default -->
+        <div id="not-found" style="display:none; background:#f1f1f1; border-radius:12px; margin:40px auto; width:600px; text-align:center; padding:40px 0;">
+            <h1 style="width:800px; position:relative; left:-100px; letter-spacing:-1px; line-height:60px; font-size:60px; font-weight:100; margin:0 0 50px 0; text-shadow:0 1px 0 #fff;">403</h1>
+            <p><strong>This RSN resource is not available.</strong></p>
+            <p>
+                If you're looking for support or information,
+                <a href="https://rougesupportnetwork.org/">visit the RSN Resource Library</a>
+                or <a href="https://rougesupportnetwork.org/">contact RSN support</a> for help.
+            </p>
+            <div id="suggestions" style="margin-top:35px; color:#ccc;">
+                <a href="https://rougesupportnetwork.org/" style="color:#666; font-weight:200; font-size:14px; margin:0 10px;">RSN Status</a> &mdash;
+                <a href="https://www.facebook.com/rougesupportnetwork" style="color:#666; font-weight:200; font-size:14px; margin:0 10px;">@rsnorg</a>
+            </div>
 
     <script>
         const messagesEl = document.getElementById('messages');

@@ -1,18 +1,21 @@
-## Prompt 1
+## Trauma-Informed, Privacy-First Prompts
 
-The site should be responsive and adapt well to narrow screen sizes.
+### Prompt 1: Responsive Design
 
-## Prompt 2
+How can I make sure the site is accessible and responsive for users on mobile devices, including those with visual or motor differences?
 
-Add a new section to the site that displays 6 featured projects. Each project should include an image placeholder, title, short description, and link to the live site.
+### Prompt 2: Consent-Driven Features
 
-## Prompt 3
+Add a section that lets users opt in to technical tools (like Sherlock) with clear consent language and a brief explanation of what each tool does and its privacy limits.
 
-Update the featured project names and descriptions to match the images I've added.
+### Prompt 3: Dignity & Autonomy in UI
 
-## Prompt 4
+Rewrite the onboarding or welcome message so it centers user dignity, autonomy, and choice. Avoid prescriptive or diagnostic language.
 
-Which OpenAI models currently support web search in the API?
-How do I use web_search_options with OpenAI’s Chat Completions API?
-What’s the difference between using Chat Completions and Responses API for web search
-Show me how to write a regular JS fetch request using the Completions API for web search (with model: "gpt-4o-search-preview") and one using the Responses API: https://platform.openai.com/docs/guides/responses-vs-chat-completions
+### Prompt 4: Safe API Usage
+
+Show a simple, beginner-friendly JavaScript example for calling the OpenAI API using the `messages` parameter, with clear comments and no secret keys in the code. Explain how to use environment variables for API keys.
+
+### Prompt 5: Web Search Model
+
+Which OpenAI models support web search, and how do I use `web_search_options` safely and transparently in a trauma-informed chatbot?

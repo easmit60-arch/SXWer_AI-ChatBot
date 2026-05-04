@@ -49,11 +49,16 @@ async function handleRequest(request) {
   // Reference: https://apclips.com/johndoe (for documentation or integration)
 
   const apiKey = OPENAI_API_KEY; // OpenAI
-  // Add other API keys as needed:
-  // const mistralKey = MISTRAL_API_KEY;
-  // const apiId = API_ID;
-  // const apifyToken = APIFY_API_TOKEN;
-  // const agentId = AGENT_ID;
+  const mistralKey =
+    typeof MISTRAL_API_KEY !== "undefined" ? MISTRAL_API_KEY : undefined;
+  const apifyToken =
+    typeof APIFY_API_TOKEN !== "undefined" ? APIFY_API_TOKEN : undefined;
+  // const apiId = typeof API_ID !== 'undefined' ? API_ID : undefined;
+  // const agentId = typeof AGENT_ID !== 'undefined' ? AGENT_ID : undefined;
+
+  // Example: If you want to require MISTRAL_API_KEY or APIFY_API_TOKEN for certain routes, add checks like:
+  // if (!mistralKey) { return new Response(JSON.stringify({ error: "Missing MISTRAL_API_KEY secret." }), { status: 500, headers: corsHeaders }); }
+  // if (!apifyToken) { return new Response(JSON.stringify({ error: "Missing APIFY_API_TOKEN secret." }), { status: 500, headers: corsHeaders }); }
 
   if (!apiKey) {
     return new Response(
