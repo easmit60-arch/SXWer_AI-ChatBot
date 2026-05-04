@@ -37,15 +37,40 @@ async function handleRequest(request) {
     });
   }
 
-  // In service-worker syntax, secrets are available as global bindings.
-  const apiKey = OPENAI_API_KEY;
+  // In Cloudflare Workers, secrets are available as environment bindings.
+  // Set your API keys in the Cloudflare dashboard, not in code.
+
+  // Example API keys to set as environment variables in Cloudflare:
+  //   OPENAI_API_KEY
+  //   MISTRAL_API_KEY
+  //   API_ID
+  //   APIFY_API_TOKEN
+  //   AGENT_ID
+  // Reference: https://apclips.com/johndoe (for documentation or integration)
+
+  const apiKey = OPENAI_API_KEY; // OpenAI
+  // Add other API keys as needed:
+  // const mistralKey = MISTRAL_API_KEY;
+  // const apiId = API_ID;
+  // const apifyToken = APIFY_API_TOKEN;
+  // const agentId = AGENT_ID;
 
   if (!apiKey) {
     return new Response(
-      JSON.stringify({ error: "Missing OPENAI_API_KEY secret." }),
+      JSON.stringify({
+        error:
+          "Missing OPENAI_API_KEY secret. Set it as an environment variable in Cloudflare.",
+      }),
       { status: 500, headers: corsHeaders },
     );
   }
+
+  // If you need to use other APIs (e.g., Mistral, Apify),
+  // add their keys as environment variables and access them the same way:
+  // const mistralKey = MISTRAL_API_KEY;
+  // const apiId = API_ID;
+  // const apifyToken = APIFY_API_TOKEN;
+  // const agentId = AGENT_ID;
 
   let userInput;
 
