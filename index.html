@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PI_AI - Trauma-Informed Support</title>
+    <title> SXWer AI Chat Bot by SXWers</title>
     <link rel="stylesheet" href="style.css">
     <style>
         * {
@@ -14,7 +14,7 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #01115b 0%, #0c0314 100%);
             min-height: 100vh;
             display: flex;
             justify-content: center;
@@ -27,7 +27,7 @@
             max-width: 900px;
             background: white;
             border-radius: 12px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 20px 60px rgba(242, 64, 64, 0.3);
             display: flex;
             flex-direction: column;
             height: 90vh;
@@ -106,14 +106,14 @@
         }
 
         .message.user .message-content {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #080e2c 0%, #db0b7332 100%);
             color: white;
         }
 
         .message.system .message-content {
             background: #fffbea;
-            color: #d4a574;
-            border-left: 3px solid #d4a574;
+            color: #d47481;
+            border-left: 3px solid #b70f47;
         }
 
         .input-area {
@@ -142,8 +142,8 @@
         input[type="text"]:focus,
         textarea:focus {
             outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            border-color: #010413;
+            box-shadow: 0 0 0 3px #db0b7332;
         }
 
         button {
@@ -160,7 +160,7 @@
 
         button:hover:not(:disabled) {
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 5px 15px #ff2207;
         }
 
         button:disabled {
@@ -192,7 +192,7 @@
         }
 
         .sherlock-input-group button {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            background: linear-gradient(135deg, #fb93a8 0%, #f5576c 100%);
         }
 
         .sherlock-input-group button:hover:not(:disabled) {
@@ -208,7 +208,7 @@
         }
 
         .status.loading {
-            color: #667eea;
+            color: #01071f;
             font-weight: 600;
         }
 
@@ -259,10 +259,9 @@
     </style>
 </head>
 <body>
-
     <div class="container">
         <div class="header">
-            <h1> PI_AI</h1>
+            <h1>PI_AI</h1>
             <p>Trauma-informed support tool with optional technical utilities. Your pace, your choices.</p>
         </div>
 
@@ -299,20 +298,7 @@
 
             <div id="status" class="status"></div>
         </div>
-
-        <!-- 404-style fallback section, hidden by default -->
-        <div id="not-found" style="display:none; background:#f1f1f1; border-radius:12px; margin:40px auto; width:600px; text-align:center; padding:40px 0;">
-            <h1 style="width:800px; position:relative; left:-100px; letter-spacing:-1px; line-height:60px; font-size:60px; font-weight:100; margin:0 0 50px 0; text-shadow:0 1px 0 #fff;">403</h1>
-            <p><strong>This RSN resource is not available.</strong></p>
-            <p>
-                If you're looking for support or information,
-                <a href="https://rougesupportnetwork.org/">visit the RSN Resource Library</a>
-                or <a href="https://rougesupportnetwork.org/">contact RSN support</a> for help.
-            </p>
-            <div id="suggestions" style="margin-top:35px; color:#ccc;">
-                <a href="https://rougesupportnetwork.org/" style="color:#666; font-weight:200; font-size:14px; margin:0 10px;">RSN Status</a> &mdash;
-                <a href="https://www.facebook.com/rougesupportnetwork" style="color:#666; font-weight:200; font-size:14px; margin:0 10px;">@rsnorg</a>
-            </div>
+    </div>
 
     <script>
         const messagesEl = document.getElementById('messages');
@@ -362,23 +348,15 @@
             const loadingMsg = appendMessage('assistant', '', true);
             setStatus('Thinking...', false, true);
 
-            let response;
             try {
-                response = await fetch('https://easmit60-arch.github.io/PI_AI/chat', {
+                const response = await fetch('/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message: text })
                 });
-                if (!response.ok) throw new Error();
-            } catch {
-                response = await fetch('/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: text })
-                });
+
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            }
-            try {
+                
                 const data = await response.json();
                 loadingMsg.remove();
                 appendMessage('assistant', data.response);
@@ -403,25 +381,21 @@
             const loadingMsg = appendMessage('assistant', '', true);
             setStatus('Running Sherlock search...', false, true);
 
-            let response;
             try {
-                response = await fetch('https://easmit60-arch.github.io/PI_AI/sherlock', {
+                const response = await fetch('/sherlock', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ usernames })
                 });
-                if (!response.ok) throw new Error();
-            } catch {
-                response = await fetch('/sherlock', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ usernames })
-                });
-                if (!response.ok) throw new Error('Sherlock request failed');
-            }
-            try {
+
                 const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Sherlock request failed');
+                }
+
                 loadingMsg.remove();
+                
                 // Format Sherlock results
                 const results = Array.isArray(data.results) 
                     ? data.results.map(r => {
@@ -430,6 +404,7 @@
                         return `<strong>${username}</strong><br>${urls}`;
                     })
                     : [`Results: ${JSON.stringify(data.results).substring(0, 200)}...`];
+
                 appendMessage('assistant', results);
                 setStatus(data.message || 'Sherlock search completed');
             } catch (error) {
