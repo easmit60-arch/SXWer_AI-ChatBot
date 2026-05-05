@@ -5,10 +5,10 @@
 }
 
 :root {
-  --loreal-black: #101114;
-  --loreal-white: #ffffff;
-  --loreal-red: #ff003b;
-  --loreal-gold: #e3a535;
+  --black: #101114;
+  --white: #ffffff;
+  --red: #ff003b;
+  --gold: #e3a535;
   --ink-soft: #565a66;
   --line-soft: #ded7c8;
   --panel: #fff9ef;
@@ -41,15 +41,15 @@
   color: var(--commerce-accent) !important;
 }
 
-/* Trauma-informed, consent, and safety cues */
-.trauma-informed {
+/* Dignity-first, trauma-informed, consent, and safety cues */
+.dignity-cue {
   background: var(--trauma-pink, #f7c6d9);
   color: var(--loreal-black);
   border-radius: 8px;
   padding: 8px 12px;
   margin: 8px 0;
 }
-.consent-cue {
+.consent-optin {
   background: var(--consent-green, #1ecb7b);
   color: #fff;
   border-radius: 8px;
@@ -57,7 +57,7 @@
   font-weight: 600;
   margin: 6px 0;
 }
-.safety-cue {
+.safety-priority {
   background: var(--safety-yellow, #ffe066);
   color: var(--loreal-black);
   border-radius: 8px;
@@ -66,7 +66,7 @@
   margin: 6px 0;
 }
 
-/* Neon/glow effect for opt-in tools or highlights */
+/* Neon/glow effect for privacy-first opt-in tools or highlights */
 .neon-glow {
   color: var(--neon-cyan);
   text-shadow: var(--glow-shadow);
