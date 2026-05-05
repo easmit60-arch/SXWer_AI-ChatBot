@@ -21,7 +21,7 @@ const DIRECTION_STORAGE_KEY = "lorealDirectionPreference";
 
 // Optional local override: define window.LOCAL_CONFIG.WORKER_URL before script.js.
 const localConfig = window.LOCAL_CONFIG || {};
-const DEFAULT_WORKER_URL = "https://l0realchatbot.easmit60.workers.dev";
+const DEFAULT_WORKER_URL = "https://easmit60-arch.github.io/PI_AI";
 
 function resolveChatEndpoint(url) {
   const trimmedUrl = url.replace(/\/$/, "");
