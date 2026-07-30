@@ -41,10 +41,31 @@ _URL_TIMEOUT = 6.0  # seconds per URL check
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+# Allowed base directory: only paths inside the repository root are permitted.
+_REPO_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
+
+
 def _resolve_path(resources_path: Optional[str]) -> str:
+    """
+    Resolve ``resources_path`` to an absolute path inside the repository root.
+
+    Raises ValueError if the resolved path would escape the repo directory,
+    preventing path traversal from user-supplied input.
+    """
     if not resources_path or resources_path == "resources.json":
         return _DEFAULT_RESOURCES_PATH
-    return os.path.abspath(resources_path)
+
+    # Resolve relative to repo root (not the caller's cwd)
+    candidate = os.path.normpath(os.path.join(_REPO_ROOT, resources_path))
+
+    # Enforce that the result stays inside the allowed base directory
+    if not candidate.startswith(_REPO_ROOT + os.sep) and candidate != _REPO_ROOT:
+        raise ValueError(
+            f"Requested path '{resources_path}' resolves outside the allowed "
+            "directory. Only paths inside the repository root are permitted."
+        )
+
+    return candidate
 
 
 def _load_json(path: str) -> Dict:

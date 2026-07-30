@@ -248,6 +248,8 @@ async def resources_update(req: ResourcePathRequest):
         return result
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         logger.error("Resource update error: %s", exc)
         raise HTTPException(status_code=500, detail="Resource update failed.") from exc
@@ -264,6 +266,8 @@ async def resources_validate(path: str = Query("resources.json")):
         return result
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         logger.error("Resource validation error: %s", exc)
         raise HTTPException(status_code=500, detail="Resource validation failed.") from exc
