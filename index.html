@@ -5,8 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SXWer AI Chat Bot by SXWers</title>
     <link rel="stylesheet" href="riot-grrrl.css" />
+    <link rel="stylesheet" href="moxie.css" />
     <style>
-      /* Riot Grrrl Palette - Inlined for immediate loading */
+      /* ========================================================================
+         CORE PRINCIPLES ENFORCED IN DESIGN
+         ========================================================================
+         
+         Dignity First: Soft, welcoming colors that don't overwhelm
+         No Assumptions: Neutral, non-judgmental visual language
+         Transparency: Clear about what the tool does and doesn't do
+         Autonomy: User controls the experience (consent, pace, choices)
+         Safety: Crisis detection, sensitive handling, no pressure
+         Technical Tools: Opt-in only (Sherlock requires explicit consent)
+         
+         ======================================================================== */
+
+      /* Riot Grrrl Palette - Primary Theme */
       :root {
         --pink: #ff2d95;
         --hot-pink: #ff4fb4;
@@ -19,6 +33,27 @@
         --gradient: linear-gradient(135deg, #ff2d95, #ff70d3, #7d2cff);
         --shadow: 0 15px 40px rgba(0,0,0,.2);
         --radius: 18px;
+        
+        /* PI_AI Neon Accents - Integrated for Sherlock section */
+        --neon-cyan: #00d4ff;
+        --neon-rouge: #ff0066;
+        --trauma-pink: #ff9eb5;
+        --blue-black: #0c0314;
+        --panel: #fafafa;
+        --line-soft: #eee;
+        --ink-soft: #666;
+        --safety-yellow: #fffbea;
+        --text-light: #f0f0f0;
+      }
+
+      /* ========================================================================
+         BASE STYLES - Trauma-Informed Design
+         ======================================================================== */
+      
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
       }
 
       body {
@@ -45,6 +80,10 @@
         overflow: hidden;
       }
 
+      /* ========================================================================
+         HEADER - Clear, Welcoming, Non-Pressuring
+         ======================================================================== */
+      
       .header {
         background: var(--pink);
         color: var(--white);
@@ -67,6 +106,10 @@
         margin: 0 auto;
       }
 
+      /* ========================================================================
+         CHAT AREA - Safe, Readable, Accessible
+         ======================================================================== */
+      
       .chat-area {
         flex: 1;
         display: flex;
@@ -132,11 +175,15 @@
       }
 
       .message.system .message-content {
-        background: #fffbea;
+        background: var(--safety-yellow);
         color: var(--pink);
         border-left: 3px solid var(--pink);
       }
 
+      /* ========================================================================
+         INPUT AREA - Clear, Simple, Accessible
+         ======================================================================== */
+      
       .input-area {
         padding: 20px;
         border-top: 1px solid var(--silver);
@@ -191,6 +238,71 @@
         cursor: not-allowed;
       }
 
+      /* ========================================================================
+         SHERLOCK SECTION - PI_AI Integration with Ethical Guardrails
+         ======================================================================== */
+      
+      .sherlock-section {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid var(--silver);
+        background: linear-gradient(135deg, rgba(255, 45, 149, 0.05), rgba(125, 44, 255, 0.05));
+        border-radius: 8px;
+        padding: 15px;
+      }
+
+      .sherlock-section label {
+        display: block;
+        font-size: 12px;
+        color: var(--pink);
+        margin-bottom: 8px;
+        font-weight: 600;
+      }
+
+      .sherlock-input-group {
+        display: flex;
+        gap: 10px;
+      }
+
+      .sherlock-input-group input {
+        flex: 1;
+        padding: 10px;
+        border: 1px solid var(--silver);
+        border-radius: var(--radius);
+        font-family: inherit;
+        font-size: 13px;
+      }
+
+      .sherlock-input-group input:focus {
+        outline: none;
+        border-color: var(--neon-cyan);
+        box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1);
+      }
+
+      .sherlock-input-group button {
+        background: linear-gradient(135deg, var(--neon-cyan), var(--neon-rouge));
+        color: var(--white);
+      }
+
+      .sherlock-input-group button:hover:not(:disabled) {
+        box-shadow: 0 5px 15px rgba(255, 0, 102, 0.4);
+      }
+
+      .sherlock-disclaimer {
+        font-size: 11px;
+        color: var(--gray);
+        margin-top: 6px;
+        font-style: italic;
+      }
+
+      .sherlock-disclaimer strong {
+        color: var(--pink);
+      }
+
+      /* ========================================================================
+         STATUS - Clear Feedback for User
+         ======================================================================== */
+      
       .status {
         padding: 10px;
         margin-top: 10px;
@@ -200,7 +312,7 @@
       }
 
       .status.loading {
-        color: var(--purple);
+        color: var(--neon-cyan);
         font-weight: 600;
       }
 
@@ -211,6 +323,10 @@
         padding: 10px;
       }
 
+      /* ========================================================================
+         SCROLLBAR - Accessible and Themed
+         ======================================================================== */
+      
       .messages::-webkit-scrollbar {
         width: 8px;
       }
@@ -228,6 +344,10 @@
         background: var(--purple);
       }
 
+      /* ========================================================================
+         LOADING ANIMATION - Gentle, Non-Intrusive
+         ======================================================================== */
+      
       .loading-dots {
         display: inline-block;
       }
@@ -249,6 +369,10 @@
         30% { opacity: 1; }
       }
 
+      /* ========================================================================
+         CONSENT BANNER - Clear, Respectful, Non-Pressuring
+         ======================================================================== */
+      
       .consent-banner {
         background: linear-gradient(135deg, var(--pink), var(--purple));
         color: var(--white);
@@ -264,33 +388,38 @@
         margin: 0 5px;
       }
 
-      .sherlock-info {
-        background: rgba(125, 44, 255, 0.1);
-        border-left: 3px solid var(--purple);
-        padding: 10px;
+      /* ========================================================================
+         INFO BANNER - Subtle, Informative
+         ======================================================================== */
+      
+      .info-banner {
+        background: linear-gradient(135deg, rgba(255, 45, 149, 0.1), rgba(125, 44, 255, 0.1));
+        border-left: 3px solid var(--pink);
+        padding: 10px 15px;
         margin: 10px 0;
-        border-radius: 4px;
+        border-radius: 8px;
         font-size: 13px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
       }
 
-      .offline-badge {
-        background: var(--pink);
-        color: var(--white);
+      .info-banner button {
         padding: 4px 8px;
-        border-radius: 4px;
         font-size: 11px;
-        font-weight: bold;
-        margin-left: 10px;
       }
 
-      /* Moxie Paperclip Companion */
+      /* ========================================================================
+         MOXIE COMPANION - Cyan/Pink/Black Neon Paperclip
+         ======================================================================== */
+      
       #moxie-paperclip {
         position: fixed;
         bottom: 20px;
         right: 20px;
         width: 60px;
         height: 60px;
-        background: linear-gradient(135deg, #ff2d95, #ff70d3, #7d2cff);
+        background: linear-gradient(135deg, var(--pink), var(--hot-pink), var(--purple));
         border-radius: 18px;
         clip-path: polygon(0% 0%, 100% 0%, 100% 70%, 70% 70%, 70% 100%, 30% 100%, 30% 70%, 0% 70%);
         z-index: 1000;
@@ -309,7 +438,7 @@
       }
 
       #moxie-paperclip::before {
-        content: '💬';
+        content: '\1F4AC';
         position: absolute;
         top: 50%;
         left: 50%;
@@ -319,26 +448,10 @@
         text-shadow: 0 2px 4px rgba(0,0,0,0.3);
       }
 
-      .moxie-message {
-        background: linear-gradient(135deg, #ff2d9520, #7d2cff20);
-        border-left: 3px solid #ff2d95;
-        padding: 10px 15px;
-        margin: 10px 0;
-        border-radius: 8px;
-        font-style: italic;
-        color: #7d2cff;
-      }
-
-      .moxie-checkin {
-        animation: pulse 2s infinite;
-      }
-
-      @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.7; }
-      }
-
-      /* Command help overlay */
+      /* ========================================================================
+         COMMAND HELP OVERLAY - Accessible, Clear
+         ======================================================================== */
+      
       .command-help {
         position: fixed;
         top: 50%;
@@ -383,38 +496,99 @@
         margin-top: 15px;
       }
 
-      /* Info banner for offline mode */
-      .info-banner {
-        background: linear-gradient(135deg, var(--pink)20, var(--purple)20);
-        border-left: 3px solid var(--pink);
-        padding: 10px 15px;
-        margin: 10px 0;
-        border-radius: 8px;
-        font-size: 13px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
+      /* ========================================================================
+         ACCESSIBILITY - High Contrast, Reduced Motion Support
+         ======================================================================== */
+      
+      @media (prefers-contrast: high) {
+        :root {
+          --pink: #ff0080;
+          --purple: #6600ff;
+          --cream: #ffffff;
+          --white: #000000;
+          --black: #ffffff;
+        }
       }
 
-      .info-banner button {
-        padding: 4px 8px;
-        font-size: 11px;
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+
+      /* ========================================================================
+         RESPONSIVE DESIGN - Works on All Devices
+         ======================================================================== */
+      
+      @media (max-width: 768px) {
+        body {
+          padding: 10px;
+        }
+        
+        .container {
+          height: 95vh;
+        }
+        
+        .message-content {
+          max-width: 85%;
+        }
+        
+        #moxie-paperclip {
+          width: 50px;
+          height: 50px;
+          font-size: 20px;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .container {
+          height: 98vh;
+          border-radius: 0;
+        }
+        
+        .header {
+          padding: 20px;
+        }
+        
+        .header h1 {
+          font-size: 24px;
+        }
+        
+        .message-content {
+          max-width: 90%;
+        }
+        
+        #moxie-paperclip {
+          width: 45px;
+          height: 45px;
+          font-size: 18px;
+        }
+        
+        .input-group {
+          flex-direction: column;
+        }
+        
+        .input-group button {
+          width: 100%;
+        }
       }
     </style>
   </head>
   <body>
     <div class="container">
       <div class="header">
-        <h1>SXWer AI Chat Bot by SXWers</h1>
+        <h1>🌸 SXWer AI Chat Bot by SXWers</h1>
         <p>
+          Trauma-informed support tool with Moxie companion. Your pace, your choices.
         </p>
         <div class="mode-toggle">
           <button id="dark-mode-toggle" title="Toggle Dark Mode">🌙</button>
           <button id="offline-toggle" title="Toggle Offline Mode">💾</button>
         </div>
-      </div>
-          Trauma-informed support tool with Moxie companion. Your pace, your choices.
-        </p>
       </div>
 
       <div class="chat-area">
@@ -431,6 +605,25 @@
           />
           <button id="send-btn">Send</button>
         </div>
+
+        <!-- SHERLOCK SECTION - Integrated from PI_AI with Ethical Guardrails -->
+        <div class="sherlock-section">
+          <label>🔍 Sherlock - Username Reconnaissance</label>
+          <div class="sherlock-input-group">
+            <input
+              type="text"
+              id="sherlock-input"
+              placeholder="Enter username to check across platforms"
+              autocomplete="off"
+            />
+            <button id="sherlock-btn">Search</button>
+          </div>
+          <p class="sherlock-disclaimer">
+            <strong>⚠️ Ethical Use Only:</strong> For your own safety verification. 
+            Never use without explicit consent. No surveillance of others.
+          </p>
+        </div>
+
         <div id="status" class="status"></div>
       </div>
     </div>
@@ -442,7 +635,7 @@
     <div id="command-help" class="command-help hidden">
       <h3>Available Commands</h3>
       <ul>
-        <li><code>/sherlock username</code> - Check username across platforms (requires consent)</li>
+        <li><code>/sherlock username</code> - Check username across platforms (requires <strong>explicit consent</strong> for safety reasons)</li>
         <li><code>/moxie message</code> - Talk to Moxie companion</li>
         <li><code>/consent yes</code> - Grant AI consent</li>
         <li><code>/consent no</code> - Revoke AI consent</li>
@@ -452,6 +645,17 @@
     </div>
 
     <script>
+      // ========================================================================
+      // CORE PRINCIPLES ENFORCED IN CODE
+      // ========================================================================
+      // Dignity First: User controls all interactions
+      // No Assumptions: Never assume user intent or needs
+      // Transparency: Clear about capabilities and limitations
+      // Autonomy: User sets pace and makes choices
+      // Safety: Crisis detection, sensitive handling
+      // Technical Tools: Opt-in only with explicit consent
+      // ========================================================================
+
       // DOM Elements
       const messagesEl = document.getElementById("messages");
       const chatInput = document.getElementById("chat-input");
@@ -459,6 +663,8 @@
       const statusEl = document.getElementById("status");
       const moxieElement = document.getElementById("moxie-paperclip");
       const commandHelp = document.getElementById("command-help");
+      const sherlockInput = document.getElementById("sherlock-input");
+      const sherlockBtn = document.getElementById("sherlock-btn");
 
       // State
       let consent = { ai: false, tools: false };
@@ -689,6 +895,26 @@
         }
       }
 
+      // Run Sherlock search
+      async function runSherlock() {
+        const input = sherlockInput.value.trim();
+        if (!input) return;
+
+        const username = input.split(',').map(u => u.trim()).filter(u => u)[0];
+        if (!username) return;
+
+        sherlockInput.value = '';
+        
+        // Check if user has given tool consent
+        if (!consent.tools) {
+          showConsentDialog('sherlock');
+          return;
+        }
+
+        // Send as command
+        sendMessage(`/sherlock ${username}`);
+      }
+
       // Show consent dialog
       function showConsentDialog(type) {
         const dialog = document.createElement('div');
@@ -724,11 +950,10 @@
         consent.tools = true;
         localStorage.setItem('sxwer_consent', JSON.stringify(consent));
         document.querySelector('.consent-banner').remove();
-        // Re-send the last message
-        const lastUserMessage = Array.from(document.querySelectorAll('.message.user .message-content'))
-          .pop()?.textContent;
-        if (lastUserMessage) {
-          sendMessage(lastUserMessage);
+        // Re-send the last Sherlock request
+        const lastSherlock = sherlockInput.value.trim();
+        if (lastSherlock) {
+          runSherlock();
         }
       }
 
@@ -760,6 +985,15 @@
         }
       });
 
+      // Sherlock button and input
+      sherlockBtn.addEventListener('click', runSherlock);
+      sherlockInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          runSherlock();
+        }
+      });
+
       // Hide command help when clicking outside
       document.addEventListener('click', (e) => {
         if (!commandHelp.contains(e.target) && e.target !== chatInput) {
@@ -772,7 +1006,6 @@
     </script>
 
     <!-- Load additional styles -->
-    <link rel="stylesheet" href="moxie.css" />
     <link rel="stylesheet" href="riot-grrrl.css" />
   </body>
 </html>
