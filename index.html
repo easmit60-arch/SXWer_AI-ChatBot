@@ -882,7 +882,22 @@
       </div>
 
       <div class="chat-area">
-        <div id="messages" class="messages"></div>
+        <div id="messages" class="messages">
+          <div class="message assistant">
+            <div class="message-content">
+              Hello. I'm here to listen without judgment. This is your space.
+              <br /><br />
+              You can:<br />
+              • Chat with me about anything you're going through<br />
+              • Use /sherlock username to check if a username appears across
+              platforms (for your safety)<br />
+              • Talk to Moxie, your desktop companion that can work inside this
+              chat or outside it<br /><br />
+              I'm trauma-informed and prioritize your dignity and autonomy.
+              What's on your mind?
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="input-area">
@@ -1247,18 +1262,6 @@
           helpPopup.classList.add("hidden");
         });
 
-        // Initial message
-        setTimeout(() => {
-          appendMessage(
-            "assistant",
-            `Hello. I'm here to listen without judgment. This is your space.\n\n` +
-              `You can:\n` +
-              `• Chat with me about anything you're going through\n` +
-              `• Use /sherlock username to check if a username appears across platforms (for your safety)\n` +
-              `• Talk to Moxie, your desktop companion that can work inside this chat or outside it\n\n` +
-              `I'm trauma-informed and prioritize your dignity and autonomy. What's on your mind?`,
-          );
-        }, 100);
       }
 
       function applySavedTheme() {

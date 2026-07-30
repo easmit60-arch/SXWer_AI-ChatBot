@@ -19,6 +19,14 @@ test("offline permissions UI exposes explicit local access choices", () => {
   assert.match(indexHtml, /offline local permissions/i);
 });
 
+test("chat UI renders an initial assistant message in the messages container", () => {
+  assert.match(
+    indexHtml,
+    /<div id="messages" class="messages">\s*<div class="message assistant">\s*<div class="message-content">/i,
+  );
+  assert.match(indexHtml, /Hello\. I'm here to listen without judgment\./i);
+});
+
 test("server exposes a local-permissions endpoint and gating", () => {
   assert.match(serverOffline, /\/api\/local-permissions/i);
   assert.match(serverOffline, /requiresLocalPermission/i);
