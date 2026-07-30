@@ -48,10 +48,16 @@ const MISTRAL_API_BASE =
   process.env.MISTRAL_API_BASE || "https://api.mistral.ai/v1/chat/completions";
 const MISTRAL_MODEL = process.env.MISTRAL_MODEL || "mistral-small-latest";
 
+// Optional Python microservice (NLP, local LLM, voice, resource management)
+const PYTHON_API_URL = process.env.PYTHON_API_URL || "";
+
 console.log(`\nSXWer AI ChatBot - ${OFFLINE_MODE ? "OFFLINE" : "ONLINE"} Mode`);
 console.log(`Model Path: ${LOCAL_MODEL_PATH}`);
 console.log(
   `Online API: ${ONLINE_API_ENABLED && MISTRAL_API_KEY ? "configured" : "disabled"}`,
+);
+console.log(
+  `Python service: ${PYTHON_API_URL ? PYTHON_API_URL : "not configured (optional)"}`,
 );
 console.log(`Server: http://localhost:${PORT}\n`);
 
@@ -299,6 +305,96 @@ function buildOnlineResponse(message, aiText) {
 }
 
 // ============================================================================
+// PYTHON MICROSERVICE INTEGRATION (Optional — degrades gracefully)
+// ============================================================================
+
+/**
+ * Check whether the Python microservice is reachable.
+ * Returns false silently when the service is not configured or not running.
+ */
+async function isPythonServiceAvailable() {
+  if (!PYTHON_API_URL) return false;
+  try {
+    const response = await fetch(`${PYTHON_API_URL}/health`, {
+      signal: AbortSignal.timeout(2000),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Classify text for safety/crisis signals using the Python ML classifier.
+ * Falls back to the built-in chatbot.js keyword detection on any failure.
+ *
+ * @param {string} text - User input to classify
+ * @returns {Promise<Object|null>} Safety result or null if unavailable
+ */
+async function callPythonSafetyClassifier(text) {
+  if (!PYTHON_API_URL) return null;
+  try {
+    const response = await fetch(`${PYTHON_API_URL}/nlp/classify-safety`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Generate a response using the local Ollama LLM via the Python service.
+ * Requires user AI consent. Returns null if unavailable.
+ *
+ * @param {string} message - User message
+ * @returns {Promise<string|null>} AI response text or null if unavailable
+ */
+async function callPythonLocalLLM(message) {
+  if (!PYTHON_API_URL || !hasAIConsent()) return null;
+  try {
+    const response = await fetch(`${PYTHON_API_URL}/llm/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, consent: true, max_tokens: 320 }),
+      signal: AbortSignal.timeout(60000),
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.response || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Analyze intent and sentiment via the Python NLP service.
+ * Requires user AI consent. Returns null if unavailable.
+ *
+ * @param {string} text - User input
+ * @returns {Promise<Object|null>} NLP analysis result or null if unavailable
+ */
+async function callPythonNLP(text) {
+  if (!PYTHON_API_URL || !hasAIConsent()) return null;
+  try {
+    const response = await fetch(`${PYTHON_API_URL}/nlp/analyze`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, consent: true }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+// ============================================================================
 // API ENDPOINTS
 // ============================================================================
 
@@ -471,23 +567,64 @@ app.post("/api/chat", async (req, res) => {
       forceLocal: !hasAIConsent() || OFFLINE_MODE,
     });
 
-    if (!OFFLINE_MODE && hasAIConsent() && MISTRAL_API_KEY) {
-      try {
-        const aiText = await callOnlineModel(message);
-        const onlineResponse = buildOnlineResponse(message, aiText);
+    // Enhanced safety check: use Python ML classifier when available,
+    // in addition to the built-in keyword detection already run above.
+    const pythonSafety = await callPythonSafetyClassifier(message);
+    if (
+      pythonSafety &&
+      pythonSafety.is_sensitive &&
+      pythonSafety.label === "crisis"
+    ) {
+      // Python classifier found a crisis signal not caught by keywords
+      const crisisResponse = formatHumanNLP({
+        userInput: message,
+        anchor: "That sounds really painful. You're not alone.",
+        mirror: `You shared: "${truncateForMirror(message, 50)}"`,
+        reframe: `I'm not a therapist or replacement for human connection. Your feelings are valid, and your safety matters.`,
+        rapport: `Are you safe right now? Crisis Text Line is available 24/7: Text HOME to 741741. Would you like more resources?`,
+        isCrisis: true,
+      });
+      return res.json({
+        response: formatResponseForDisplay(crisisResponse),
+        safetyFlag: pythonSafety,
+        isCrisis: true,
+      });
+    }
+
+    // AI-assisted response: try Python local LLM first (fully on-device),
+    // then fall back to external Mistral API, then to local ethical response.
+    if (hasAIConsent()) {
+      // 1. Python local LLM (Ollama — no external API, highest privacy)
+      const localLLMText = await callPythonLocalLLM(message);
+      if (localLLMText) {
+        const localLLMResponse = buildOnlineResponse(message, localLLMText);
         return res.json({
-          response: formatResponseForDisplay(onlineResponse),
-          offline: false,
-          online: true,
-          provider: "mistral",
-          model: MISTRAL_MODEL,
+          response: formatResponseForDisplay(localLLMResponse),
+          offline: true,
+          provider: "ollama",
           aiAssisted: true,
         });
-      } catch (error) {
-        console.warn(
-          "Online API call failed, falling back to local response:",
-          error.message,
-        );
+      }
+
+      // 2. External Mistral API (online mode only)
+      if (!OFFLINE_MODE && MISTRAL_API_KEY) {
+        try {
+          const aiText = await callOnlineModel(message);
+          const onlineResponse = buildOnlineResponse(message, aiText);
+          return res.json({
+            response: formatResponseForDisplay(onlineResponse),
+            offline: false,
+            online: true,
+            provider: "mistral",
+            model: MISTRAL_MODEL,
+            aiAssisted: true,
+          });
+        } catch (error) {
+          console.warn(
+            "Online API call failed, falling back to local response:",
+            error.message,
+          );
+        }
       }
     }
 
@@ -537,6 +674,33 @@ app.post("/api/chat", async (req, res) => {
       response: formatResponseForDisplay(response),
       error: error.message,
     });
+  }
+});
+
+/**
+ * GET /api/python-status - Python microservice availability and features
+ */
+app.get("/api/python-status", async (req, res) => {
+  const available = await isPythonServiceAvailable();
+
+  if (!available) {
+    return res.json({
+      available: false,
+      url: PYTHON_API_URL || null,
+      message: PYTHON_API_URL
+        ? "Python service is configured but not reachable. Start it with: cd python && uvicorn app:app --host 127.0.0.1 --port 8000"
+        : "Python service is not configured. Set PYTHON_API_URL in .env to enable enhanced NLP, local LLM, and voice features.",
+    });
+  }
+
+  try {
+    const response = await fetch(`${PYTHON_API_URL}/health`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    const health = await response.json();
+    return res.json({ available: true, url: PYTHON_API_URL, health });
+  } catch {
+    return res.json({ available: true, url: PYTHON_API_URL });
   }
 });
 
