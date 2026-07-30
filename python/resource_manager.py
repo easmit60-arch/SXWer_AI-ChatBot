@@ -41,31 +41,38 @@ _URL_TIMEOUT = 6.0  # seconds per URL check
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-# Allowed base directory: only paths inside the repository root are permitted.
+# Whitelist of allowed resource file names mapped to their absolute paths.
+# Only these filenames may be passed by callers — no path construction from
+# user input occurs, which prevents path traversal completely.
 _REPO_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
+
+_ALLOWED_RESOURCE_FILES: dict = {
+    "resources.json": _DEFAULT_RESOURCES_PATH,
+}
 
 
 def _resolve_path(resources_path: Optional[str]) -> str:
     """
-    Resolve ``resources_path`` to an absolute path inside the repository root.
+    Map a user-supplied filename to its trusted absolute path.
 
-    Raises ValueError if the resolved path would escape the repo directory,
-    preventing path traversal from user-supplied input.
+    Only filenames present in ``_ALLOWED_RESOURCE_FILES`` are accepted.
+    Raises ValueError for any other value, preventing path traversal.
+    The returned path is always a trusted constant from the whitelist — it
+    is never derived from the user-supplied string.
     """
-    if not resources_path or resources_path == "resources.json":
+    if not resources_path:
         return _DEFAULT_RESOURCES_PATH
 
-    # Resolve relative to repo root (not the caller's cwd)
-    candidate = os.path.normpath(os.path.join(_REPO_ROOT, resources_path))
-
-    # Enforce that the result stays inside the allowed base directory
-    if not candidate.startswith(_REPO_ROOT + os.sep) and candidate != _REPO_ROOT:
+    resolved = _ALLOWED_RESOURCE_FILES.get(resources_path)
+    if resolved is None:
+        allowed = ", ".join(sorted(_ALLOWED_RESOURCE_FILES))
         raise ValueError(
-            f"Requested path '{resources_path}' resolves outside the allowed "
-            "directory. Only paths inside the repository root are permitted."
+            f"'{resources_path}' is not an allowed resource file. "
+            f"Allowed values: {allowed}"
         )
 
-    return candidate
+    # Return the pre-computed constant path — not derived from user input
+    return resolved
 
 
 def _load_json(path: str) -> Dict:
