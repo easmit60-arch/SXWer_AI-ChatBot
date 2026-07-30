@@ -442,3 +442,173 @@ button:disabled {
     padding: 15px;
   }
 }
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --pink: #ff4fb4;
+    --hot-pink: #ff70d3;
+    --purple: #a855f7;
+    --black: #ffffff;
+    --white: #1a1a2e;
+    --cream: #16213e;
+    --gray: #b8c5d6;
+    --silver: #4a5568;
+    --gradient: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+    --shadow: 0 15px 40px rgba(0,0,0,0.4);
+  }
+  
+  body {
+    background: var(--gradient);
+    color: var(--white);
+  }
+  
+  .container {
+    background: var(--cream);
+    border: 1px solid var(--silver);
+  }
+  
+  .header {
+    background: var(--pink);
+    color: var(--black);
+  }
+  
+  .message.assistant .message-content {
+    background: var(--cream);
+    color: var(--white);
+    border: 1px solid var(--silver);
+  }
+  
+  .message.user .message-content {
+    background: var(--purple);
+    color: var(--white);
+  }
+  
+  .message.moxie .message-content {
+    background: linear-gradient(135deg, #ff4fb430, #a855f730);
+    border-left: 3px solid var(--pink);
+    color: var(--white);
+  }
+  
+  .message.system .message-content {
+    background: #2d1b4e;
+    color: var(--pink);
+    border-left: 3px solid var(--pink);
+  }
+  
+  .input-area {
+    background: var(--cream);
+    border-top: 1px solid var(--silver);
+  }
+  
+  input[type="text"],
+  textarea {
+    background: var(--white);
+    color: var(--black);
+    border: 1px solid var(--silver);
+  }
+  
+  button {
+    background: var(--purple);
+    color: var(--white);
+  }
+  
+  .status {
+    color: var(--gray);
+  }
+  
+  .consent-banner {
+    background: linear-gradient(135deg, var(--pink), var(--purple));
+    color: var(--black);
+  }
+  
+  .info-banner {
+    background: linear-gradient(135deg, #ff4fb420, #a855f720);
+    border-left: 3px solid var(--pink);
+    color: var(--white);
+  }
+}
+
+/* Manual Dark Mode Toggle */
+.dark-mode {
+  --pink: #ff4fb4;
+  --hot-pink: #ff70d3;
+  --purple: #a855f7;
+  --black: #ffffff;
+  --white: #1a1a2e;
+  --cream: #16213e;
+  --gray: #b8c5d6;
+  --silver: #4a5568;
+  --gradient: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+  --shadow: 0 15px 40px rgba(0,0,0,0.4);
+}
+
+.dark-mode body {
+  background: var(--gradient);
+  color: var(--white);
+}
+
+.dark-mode .container {
+  background: var(--cream);
+  border: 1px solid var(--silver);
+}
+
+.dark-mode .header {
+  background: var(--pink);
+  color: var(--black);
+}
+
+.dark-mode .message.assistant .message-content {
+  background: var(--cream);
+  color: var(--white);
+  border: 1px solid var(--silver);
+}
+
+.dark-mode .message.user .message-content {
+  background: var(--purple);
+  color: var(--white);
+}
+
+.dark-mode .message.moxie .message-content {
+  background: linear-gradient(135deg, #ff4fb430, #a855f730);
+  border-left: 3px solid var(--pink);
+  color: var(--white);
+}
+
+.dark-mode .message.system .message-content {
+  background: #2d1b4e;
+  color: var(--pink);
+  border-left: 3px solid var(--pink);
+}
+
+.dark-mode .input-area {
+  background: var(--cream);
+  border-top: 1px solid var(--silver);
+}
+
+.dark-mode input[type="text"],
+.dark-mode textarea {
+  background: var(--white);
+  color: var(--black);
+  border: 1px solid var(--silver);
+}
+
+.dark-mode button {
+  background: var(--purple);
+  color: var(--white);
+}
+
+.dark-mode .status {
+  color: var(--gray);
+}
+
+.dark-mode .consent-banner {
+  background: linear-gradient(135deg, var(--pink), var(--purple));
+  color: var(--black);
+}
+
+.dark-mode .info-banner {
+  background: linear-gradient(135deg, #ff4fb420, #a855f720);
+  border-left: 3px solid var(--pink);
+  color: var(--white);
+}
