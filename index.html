@@ -695,6 +695,87 @@
       }
 
       /* ========================================================================
+         MISTRAL DISCLOSURE MODAL - Transparency Before AI Consent
+         ======================================================================== */
+
+      .disclosure-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.55);
+        z-index: 3000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .disclosure-overlay.hidden {
+        display: none;
+      }
+
+      .disclosure-modal {
+        background: var(--cream);
+        border-radius: var(--radius);
+        padding: 24px;
+        box-shadow: var(--shadow);
+        max-width: 480px;
+        width: calc(100vw - 40px);
+        max-height: 80vh;
+        overflow-y: auto;
+      }
+
+      .disclosure-modal h3 {
+        color: var(--purple);
+        margin: 0 0 12px;
+        font-size: 17px;
+      }
+
+      .disclosure-modal p {
+        font-size: 13px;
+        line-height: 1.55;
+        color: var(--black);
+        margin: 0 0 10px;
+      }
+
+      .disclosure-modal .disclosure-detail {
+        background: rgba(125, 44, 255, 0.06);
+        border-left: 3px solid var(--purple);
+        border-radius: 6px;
+        padding: 10px 14px;
+        margin: 10px 0;
+        font-size: 12px;
+        line-height: 1.6;
+        color: var(--black);
+      }
+
+      .disclosure-modal .disclosure-detail strong {
+        color: var(--purple);
+      }
+
+      .disclosure-modal .disclosure-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 16px;
+        flex-wrap: wrap;
+      }
+
+      .disclosure-modal .disclosure-actions button {
+        flex: 1;
+        min-width: 120px;
+      }
+
+      .disclosure-modal .disclosure-actions .btn-decline {
+        background: transparent;
+        color: var(--gray);
+        border: 1px solid var(--silver);
+      }
+
+      .disclosure-modal .disclosure-actions .btn-decline:hover:not(:disabled) {
+        background: var(--silver);
+        transform: none;
+        box-shadow: none;
+      }
+
+      /* ========================================================================
          ACCESSIBILITY - High Contrast, Reduced Motion Support
          ======================================================================== */
 
@@ -941,6 +1022,43 @@
       </button>
     </div>
 
+    <!-- Mistral Data Disclosure Modal — shown before switching to online mode -->
+    <div
+      id="mistral-disclosure-overlay"
+      class="disclosure-overlay hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="mistral-disclosure-title"
+    >
+      <div class="disclosure-modal">
+        <h3 id="mistral-disclosure-title">Before enabling online AI — what this means</h3>
+        <p>
+          Switching to <strong>Online mode</strong> sends your chat messages to
+          an external AI service operated by
+          <strong>Mistral AI</strong> (mistral.ai). Nothing leaves your device
+          until you also give AI consent.
+        </p>
+        <div class="disclosure-detail">
+          <strong>AI model:</strong> <span id="mistral-model-name">mistral-small-latest</span><br>
+          <strong>Data sent to Mistral:</strong> The full text of each message you send while AI is enabled.<br>
+          <strong>Who receives it:</strong> Mistral AI, a French company subject to EU law.<br>
+          <strong>Data retention:</strong> Mistral's API terms state that messages sent via the API are not used to train models by default. See
+          <a href="https://mistral.ai/privacy" target="_blank" rel="noopener noreferrer">mistral.ai/privacy</a>.<br>
+          <strong>Training use:</strong> Not used for training under the standard API agreement.<br>
+          <strong>Your control:</strong> You can switch back to Offline mode or type <code>/consent no</code> at any time to stop AI processing.
+        </div>
+        <p>
+          Online mode alone does not send data. Data is only sent when you also
+          give AI consent (by typing <code>/consent yes</code> or clicking
+          "Yes, I consent" in the AI dialog).
+        </p>
+        <div class="disclosure-actions">
+          <button id="mistral-disclosure-accept" type="button">I understand — enable online mode</button>
+          <button id="mistral-disclosure-decline" class="btn-decline" type="button">Cancel — stay offline</button>
+        </div>
+      </div>
+    </div>
+
     <script>
       // ========================================================================
       // CORE PRINCIPLES ENFORCED IN CODE
@@ -976,11 +1094,16 @@
       const commandHelp = document.getElementById("command-help");
       const sherlockInput = document.getElementById("sherlock-input");
       const sherlockBtn = document.getElementById("sherlock-btn");
+      const mistralDisclosureOverlay = document.getElementById("mistral-disclosure-overlay");
+      const mistralDisclosureAccept = document.getElementById("mistral-disclosure-accept");
+      const mistralDisclosureDecline = document.getElementById("mistral-disclosure-decline");
 
       // State
       let consent = { ai: false, tools: false };
       let localPermissions = { offline: false, grantedAt: null };
       let moxieCheckInInterval = null;
+      // Stores the online AI model name received from /api/health
+      let onlineModelName = "mistral-small-latest";
 
       // Moxie Configuration
       const MOXIE_CONFIG = {
@@ -1031,6 +1154,9 @@
         fetch("/api/health")
           .then((res) => res.json())
           .then((data) => {
+            if (data.onlineModel) {
+              onlineModelName = data.onlineModel;
+            }
             if (data.mode === "offline") {
               setOnlineToggleState(false);
               showOfflineBanner();
@@ -1052,6 +1178,17 @@
         // Start Moxie check-ins
         startMoxieCheckIns();
 
+        // Mistral disclosure modal buttons
+        mistralDisclosureAccept.addEventListener("click", () => {
+          mistralDisclosureOverlay.classList.add("hidden");
+          setOnlineToggleState(true);
+          showOfflineBanner("Online mode enabled. AI requires separate consent.");
+        });
+        mistralDisclosureDecline.addEventListener("click", () => {
+          mistralDisclosureOverlay.classList.add("hidden");
+          // Leave toggle in its current (offline) state — user cancelled
+        });
+
         darkModeToggle.addEventListener("click", () => {
           document.body.classList.toggle("dark-mode");
           updateModeButtons();
@@ -1063,14 +1200,17 @@
 
         offlineToggle.addEventListener("click", () => {
           const isOnline = offlineToggle.classList.contains("on");
-          offlineToggle.classList.toggle("on", !isOnline);
-          offlineToggle.classList.toggle("off", isOnline);
-          offlineToggle.querySelector(".label").textContent = isOnline
-            ? "Offline"
-            : "Online";
-          showOfflineBanner(
-            !isOnline ? "Online mode enabled." : "Offline mode enabled.",
-          );
+          if (isOnline) {
+            // Switching from online → offline: no disclosure needed
+            setOnlineToggleState(false);
+            showOfflineBanner("Offline mode enabled.");
+          } else {
+            // Switching from offline → online: show Mistral disclosure first
+            document.getElementById("mistral-model-name").textContent =
+              onlineModelName;
+            mistralDisclosureOverlay.classList.remove("hidden");
+            mistralDisclosureAccept.focus();
+          }
         });
 
         // Set up Moxie click handler
@@ -1431,11 +1571,18 @@
         dialog.className = "consent-banner";
 
         if (type === "sherlock") {
+          // Build the Apify disclosure line conditionally based on online mode
+          const isOnline = !isOfflineMode();
+          const apifyNotice = isOnline
+            ? `<p><strong>Third-party notice (online mode):</strong> When online mode is active, username searches are processed by <strong>Apify</strong> (apify.com), a third-party data service. Apify receives the username you search for and returns publicly available profile data. Apify's privacy policy applies to that data.</p>`
+            : `<p>You are in <strong>offline mode</strong>. Searches use a local demonstration database only — no username leaves your device.</p>`;
+
           dialog.innerHTML = `
             <p><strong>Sherlock requires your explicit consent.</strong></p>
             <p>This tool searches public social media profiles for safety/verification only.</p>
             <p>Never for surveillance of others without their knowledge.</p>
-            <p>No personal data is stored. Results are for your use only.</p>
+            ${apifyNotice}
+            <p>No personal data is stored by this app. Results are for your use only.</p>
             <p>Do you consent to using Sherlock?</p>
             <button onclick="grantSherlockConsent()">Yes, I consent</button>
             <button onclick="this.parentElement.remove()">No, cancel</button>

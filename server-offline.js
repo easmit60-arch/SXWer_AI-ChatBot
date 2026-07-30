@@ -654,6 +654,7 @@ app.get("/api/health", (req, res) => {
     mode: OFFLINE_MODE ? "offline" : "online",
     model: modelLoaded ? localModel.name : null,
     onlineApiConfigured: Boolean(MISTRAL_API_KEY),
+    onlineModel: MISTRAL_MODEL,
     timestamp: new Date().toISOString(),
   });
 });

@@ -125,16 +125,15 @@ function setUserConsent(aiConsent = false, toolsConsent = false) {
     ai: Boolean(aiConsent),
     tools: Boolean(toolsConsent),
   });
-  console.log("[CONSENT] Updated consent state:", userConsent);
+  // Do not log consent values — they are sensitive user state
+  console.log("[CONSENT] Consent state updated.");
 
-  // Audit log for transparency
+  // Audit log for transparency (no values logged)
   if (aiConsent) {
-    console.log("[AUDIT] AI consent granted - user can now use generative AI");
+    console.log("[AUDIT] AI consent granted.");
   }
   if (toolsConsent) {
-    console.log(
-      "[AUDIT] Tools consent granted - user can now use external tools",
-    );
+    console.log("[AUDIT] Tools consent granted.");
   }
 }
 
@@ -992,7 +991,8 @@ export class EthicalChatBot {
    * @returns {HumanNLPResponse} Protocol-compliant response
    */
   handleSherlockRequest(message, username) {
-    console.log("[TOOL] Sherlock request received for:", username);
+    // Do not log the username — it is personal user data
+    console.log("[TOOL] Sherlock request received.");
 
     // Validate username first
     const validation = validateSherlockUsername(username);
@@ -1073,7 +1073,8 @@ export class EthicalChatBot {
   setAIConsent(consent) {
     setUserConsent(consent, this.toolConsentGiven);
     this.userConsentGiven = consent;
-    console.log("[CONSENT] AI consent set to:", consent);
+    // Do not log consent values — they are sensitive user state
+    console.log("[CONSENT] AI consent updated.");
   }
 
   /**
@@ -1083,7 +1084,8 @@ export class EthicalChatBot {
   setToolConsent(consent) {
     setUserConsent(this.userConsentGiven, consent);
     this.toolConsentGiven = consent;
-    console.log("[CONSENT] Tools consent set to:", consent);
+    // Do not log consent values — they are sensitive user state
+    console.log("[CONSENT] Tools consent updated.");
   }
 
   /**
