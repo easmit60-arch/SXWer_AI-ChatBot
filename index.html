@@ -1388,8 +1388,9 @@
       ) {
         const banner = document.createElement("div");
         banner.className = "info-banner";
+        const safeMessage = String(message).replace(/</g, "&lt;").replace(/>/g, "&gt;");
         banner.innerHTML = `
-          <span><strong>Status:</strong> ${message}</span>
+          <span><strong>Status:</strong> ${safeMessage}</span>
           <button onclick="this.parentElement.remove()">Dismiss</button>
         `;
         document.querySelector(".input-area").prepend(banner);
@@ -1399,8 +1400,9 @@
       function showModelInfo(modelName) {
         const banner = document.createElement("div");
         banner.className = "info-banner";
+        const safeModelName = String(modelName).replace(/</g, "&lt;").replace(/>/g, "&gt;");
         banner.innerHTML = `
-          <span> <strong>Model:</strong> ${modelName} loaded successfully.</span>
+          <span> <strong>Model:</strong> ${safeModelName} loaded successfully.</span>
           <button onclick="this.parentElement.remove()">Dismiss</button>
         `;
         document.querySelector(".input-area").prepend(banner);

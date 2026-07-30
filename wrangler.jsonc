@@ -1,14 +1,25 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "l0realchatbot",
+  // worker.js handles /api/* routes; static assets are served by the ASSETS binding.
+  // Without "main", Cloudflare only serves static GET/HEAD requests which causes
+  // HTTP 405 for every POST to /api/chat.
+  "main": "worker.js",
   "compatibility_date": "2026-04-14",
   "observability": {
     "enabled": true
   },
   "assets": {
-    "directory": "."
+    "directory": ".",
+    // Expose the assets store to the worker as env.ASSETS
+    "binding": "ASSETS"
   },
   "compatibility_flags": [
     "nodejs_compat"
   ]
+  // Set secrets via: wrangler secret put MISTRAL_API_KEY
+  // Or in .dev.vars for local wrangler dev use:
+  //   MISTRAL_API_KEY=your_key_here
+  //   MISTRAL_API_BASE=https://api.mistral.ai/v1/chat/completions
+  //   MISTRAL_MODEL=mistral-small-latest
 }
