@@ -1,8 +1,9 @@
 {
   "name": "sxwer-ai-chatbot",
   "version": "1.0.0",
-  "description": "Trauma-informed, privacy-first AI support tool for sex workers - USB/Offline version",
+  "description": "Trauma-informed, privacy-first AI support tool for sex workers - offline web app",
   "main": "server-offline.js",
+  "type": "module",
   "scripts": {
     "start": "node server-offline.js",
     "start:usb": "OFFLINE_MODE=true node server-offline.js",

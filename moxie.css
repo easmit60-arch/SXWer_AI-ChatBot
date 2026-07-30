@@ -12,11 +12,23 @@
   height: 60px;
   background: linear-gradient(135deg, #ff2d95, #ff70d3, #7d2cff);
   border-radius: 18px;
-  clip-path: polygon(0% 0%, 100% 0%, 100% 70%, 70% 70%, 70% 100%, 30% 100%, 30% 70%, 0% 70%);
+  clip-path: polygon(
+    0% 0%,
+    100% 0%,
+    100% 70%,
+    70% 70%,
+    70% 100%,
+    30% 100%,
+    30% 70%,
+    0% 70%
+  );
   z-index: 1000;
   cursor: pointer;
-  box-shadow: 0 15px 40px rgba(0,0,0,.2);
-  transition: transform 0.3s ease, box-shadow 0.3s ease, filter 0.3s ease;
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease,
+    filter 0.3s ease;
 }
 
 #moxie-paperclip:hover {
@@ -36,14 +48,14 @@
 }
 
 #moxie-paperclip::before {
-  content: '💬';
+  content: "";
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
   font-size: 24px;
   color: white;
-  text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   transition: transform 0.3s ease;
 }
 
@@ -70,7 +82,7 @@
 }
 
 .message.moxie .message-content::before {
-  content: '💬';
+  content: "";
   position: absolute;
   left: -25px;
   top: 50%;
@@ -84,7 +96,8 @@
 }
 
 @keyframes moxiePulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
     transform: translateY(0);
   }
@@ -96,7 +109,8 @@
 
 /* Moxie Speaking Animation */
 @keyframes moxieSpeak {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
   }
   25% {
@@ -114,6 +128,81 @@
   animation: moxieSpeak 0.5s ease;
 }
 
+/* Moxie Widget */
+.moxie-widget {
+  position: fixed;
+  right: 24px;
+  bottom: 96px;
+  width: min(320px, calc(100vw - 32px));
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid #e6dff6;
+  border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(17, 17, 17, 0.18);
+  z-index: 1100;
+  overflow: hidden;
+}
+
+.moxie-widget.hidden {
+  display: none;
+}
+
+.moxie-widget-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, #ff2d95, #7d2cff);
+  color: #ffffff;
+}
+
+.moxie-widget-title {
+  font-weight: 700;
+}
+
+.moxie-widget-close {
+  border: none;
+  background: transparent;
+  color: #ffffff;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.moxie-widget-body {
+  padding: 14px;
+}
+
+.moxie-widget-text {
+  color: #4b2c6a;
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.moxie-widget-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.moxie-widget-actions button {
+  border: none;
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: linear-gradient(135deg, #ff2d95, #7d2cff);
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.moxie-widget-notifications {
+  padding: 10px 12px;
+  background: #f7f3ff;
+  border-radius: 10px;
+  color: #4b2c6a;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
 /* Moxie Tooltip */
 #moxie-paperclip::after {
   content: attr(aria-label);
@@ -129,7 +218,7 @@
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.3s ease;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
 #moxie-paperclip:hover::after {
@@ -137,7 +226,7 @@
 }
 
 #moxie-paperclip::after::before {
-  content: '';
+  content: "";
   position: absolute;
   top: -6px;
   right: 15px;
@@ -193,7 +282,8 @@
 }
 
 @keyframes moxieLoading {
-  0%, 100% {
+  0%,
+  100% {
     filter: brightness(1);
   }
   50% {
@@ -208,7 +298,8 @@
 }
 
 @keyframes moxieError {
-  0%, 100% {
+  0%,
+  100% {
     transform: rotate(0deg);
   }
   25% {
@@ -286,7 +377,9 @@
 }
 
 @keyframes moxieTyping {
-  0%, 60%, 100% {
+  0%,
+  60%,
+  100% {
     transform: translateY(0);
     opacity: 0.5;
   }
@@ -298,7 +391,8 @@
 
 /* Moxie Floating Animation (when idle) */
 @keyframes moxieFloat {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateY(0);
   }
   50% {
@@ -318,11 +412,11 @@
     bottom: 10px;
     right: 10px;
   }
-  
+
   #moxie-paperclip::before {
     font-size: 20px;
   }
-  
+
   #moxie-paperclip::after {
     bottom: 60px;
     font-size: 11px;
@@ -336,7 +430,7 @@
     width: 45px;
     height: 45px;
   }
-  
+
   #moxie-paperclip::before {
     font-size: 18px;
   }
@@ -357,7 +451,7 @@
   #moxie-paperclip {
     border: 2px solid #ffffff;
   }
-  
+
   .message.moxie .message-content {
     border-left-width: 4px;
   }
@@ -368,7 +462,7 @@
   #moxie-paperclip {
     box-shadow: 0 15px 40px rgba(255, 45, 149, 0.3);
   }
-  
+
   #moxie-paperclip::after {
     background: #222222;
     color: #ffffff;

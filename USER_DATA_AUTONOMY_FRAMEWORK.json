@@ -1,0 +1,135 @@
+{
+  "title": "User Data Autonomy Framework",
+  "purpose": "Every person has the right to understand what data exists about them, why it exists, who can access it, and how they can control it.",
+  "principles": [
+    "Nothing is collected without a documented purpose.",
+    "Every collection is explained in plain language.",
+    "Consent is explicit, informed, and revocable.",
+    "Users can view, export, correct, or delete their own data.",
+    "Local-first processing is preferred whenever possible.",
+    "Data minimization is the default.",
+    "Human dignity takes priority over optimization."
+  ],
+  "dataCategories": {
+    "IdentityData": {
+      "description": "Information that directly identifies you.",
+      "examples": [
+        "Name",
+        "Email Address",
+        "Phone Number",
+        "Username",
+        "Date of Birth",
+        "Government ID (when legally required)"
+      ],
+      "whyCollected": "Only when necessary for account creation or legal compliance.",
+      "userRights": ["View", "Update", "Delete", "Export", "Revoke Consent"]
+    },
+    "DeviceData": {
+      "description": "Information about the device you use.",
+      "examples": [
+        "IP Address",
+        "Device Model",
+        "Operating System",
+        "Browser",
+        "Screen Resolution",
+        "Language",
+        "Time Zone"
+      ],
+      "whyCollected": "Improve compatibility and troubleshoot problems.",
+      "userRights": ["View", "Opt Out", "Delete Logs"]
+    },
+    "LocationData": {
+      "description": "Approximate or precise location information.",
+      "examples": ["GPS", "Wi-Fi", "Cell Towers", "Approximate IP Location"],
+      "whyCollected": "Only when location features are requested.",
+      "permissionRequired": true,
+      "userRights": ["Grant Permission", "Deny Permission", "Revoke Permission"]
+    },
+    "UsageData": {
+      "description": "How you interact with the application.",
+      "examples": [
+        "Pages Visited",
+        "Clicks",
+        "Scrolling",
+        "Searches",
+        "Time Spent"
+      ],
+      "whyCollected": "Improve usability and accessibility.",
+      "userRights": ["View", "Delete", "Disable Analytics"]
+    },
+    "TechnicalLogs": {
+      "description": "Automatic system logs used for reliability.",
+      "examples": [
+        "Errors",
+        "Crash Reports",
+        "API Requests",
+        "Performance Metrics"
+      ],
+      "whyCollected": "Maintain system stability.",
+      "userRights": ["View", "Delete when possible"]
+    },
+    "BehavioralData": {
+      "description": "Patterns that describe how services are used.",
+      "examples": ["Preferences", "History", "Recommendations"],
+      "whyCollected": "Only with explicit consent.",
+      "permissionRequired": true,
+      "userRights": ["Opt In", "Opt Out", "Delete"]
+    },
+    "Communications": {
+      "description": "Content you intentionally share.",
+      "examples": ["Messages", "Emails", "Voice", "Video", "Attachments"],
+      "encrypted": true,
+      "userRights": ["View", "Download", "Delete"]
+    },
+    "AIInteractions": {
+      "description": "Information shared while interacting with AI.",
+      "examples": ["Prompts", "Responses", "Conversation History", "Feedback"],
+      "whyCollected": "Only if the user explicitly agrees.",
+      "permissionRequired": true,
+      "userRights": [
+        "Disable AI Memory",
+        "Delete Conversations",
+        "Export History"
+      ]
+    },
+    "Sensors": {
+      "description": "Hardware sensors that require permission.",
+      "examples": [
+        "Camera",
+        "Microphone",
+        "Bluetooth",
+        "Accelerometer",
+        "Health Sensors"
+      ],
+      "permissionRequired": true,
+      "userRights": ["Grant", "Deny", "Revoke"]
+    },
+    "Metadata": {
+      "description": "Information about activity rather than its content.",
+      "examples": [
+        "Time",
+        "Device",
+        "Duration",
+        "File Size",
+        "Network Information"
+      ],
+      "whyCollected": "Only when operationally necessary.",
+      "userRights": ["View", "Delete when possible"]
+    }
+  },
+  "autonomyGuarantee": {
+    "questions": [
+      "What is being collected?",
+      "Why is it needed?",
+      "Is consent required?",
+      "Who can access it?",
+      "Where is it stored?",
+      "How long is it retained?",
+      "Can I export it?",
+      "Can I delete it?",
+      "Can I revoke permission?",
+      "What happens if I say no?"
+    ],
+    "rule": "If these questions cannot be answered, the data should not be collected."
+  }
+}

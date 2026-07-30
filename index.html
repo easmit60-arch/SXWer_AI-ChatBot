@@ -31,9 +31,9 @@
         --gray: #8b8b8b;
         --silver: #d6d6d6;
         --gradient: linear-gradient(135deg, #ff2d95, #ff70d3, #7d2cff);
-        --shadow: 0 15px 40px rgba(0,0,0,.2);
+        --shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
         --radius: 18px;
-        
+
         /* PI_AI Neon Accents - Integrated for Sherlock section */
         --neon-cyan: #00d4ff;
         --neon-rouge: #ff0066;
@@ -42,14 +42,14 @@
         --panel: #fafafa;
         --line-soft: #eee;
         --ink-soft: #666;
-        --safety-yellow: #fffbea;
+        --safety-yellow: #feefab;
         --text-light: #f0f0f0;
       }
 
       /* ========================================================================
          BASE STYLES - Trauma-Informed Design
          ======================================================================== */
-      
+
       * {
         margin: 0;
         padding: 0;
@@ -57,9 +57,10 @@
       }
 
       body {
-        background: var(--gradient);
+        background: linear-gradient(135deg, #f7f5ef 0%, #fdfaf4 100%);
         color: var(--black);
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         min-height: 100vh;
         margin: 0;
         padding: 20px;
@@ -69,7 +70,7 @@
       }
 
       .container {
-        background: var(--cream);
+        background: #f7f5ef;
         border-radius: var(--radius);
         box-shadow: var(--shadow);
         max-width: 900px;
@@ -83,7 +84,7 @@
       /* ========================================================================
          HEADER - Clear, Welcoming, Non-Pressuring
          ======================================================================== */
-      
+
       .header {
         background: var(--pink);
         color: var(--white);
@@ -96,7 +97,7 @@
         font-size: 28px;
         margin-bottom: 8px;
         font-weight: 700;
-        text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
       }
 
       .header p {
@@ -109,7 +110,7 @@
       /* ========================================================================
          CHAT AREA - Safe, Readable, Accessible
          ======================================================================== */
-      
+
       .chat-area {
         flex: 1;
         display: flex;
@@ -183,7 +184,7 @@
       /* ========================================================================
          INPUT AREA - Clear, Simple, Accessible
          ======================================================================== */
-      
+
       .input-area {
         padding: 20px;
         border-top: 1px solid var(--silver);
@@ -241,12 +242,16 @@
       /* ========================================================================
          SHERLOCK SECTION - PI_AI Integration with Ethical Guardrails
          ======================================================================== */
-      
+
       .sherlock-section {
         margin-top: 10px;
         padding-top: 10px;
         border-top: 1px solid var(--silver);
-        background: linear-gradient(135deg, rgba(255, 45, 149, 0.05), rgba(125, 44, 255, 0.05));
+        background: linear-gradient(
+          135deg,
+          rgba(255, 45, 149, 0.05),
+          rgba(125, 44, 255, 0.05)
+        );
         border-radius: 8px;
         padding: 15px;
       }
@@ -280,7 +285,11 @@
       }
 
       .sherlock-input-group button {
-        background: linear-gradient(135deg, var(--neon-cyan), var(--neon-rouge));
+        background: linear-gradient(
+          135deg,
+          var(--neon-cyan),
+          var(--neon-rouge)
+        );
         color: var(--white);
       }
 
@@ -302,7 +311,7 @@
       /* ========================================================================
          STATUS - Clear Feedback for User
          ======================================================================== */
-      
+
       .status {
         padding: 10px;
         margin-top: 10px;
@@ -326,7 +335,7 @@
       /* ========================================================================
          SCROLLBAR - Accessible and Themed
          ======================================================================== */
-      
+
       .messages::-webkit-scrollbar {
         width: 8px;
       }
@@ -347,7 +356,7 @@
       /* ========================================================================
          LOADING ANIMATION - Gentle, Non-Intrusive
          ======================================================================== */
-      
+
       .loading-dots {
         display: inline-block;
       }
@@ -365,14 +374,20 @@
       }
 
       @keyframes blink {
-        0%, 60%, 100% { opacity: 0.5; }
-        30% { opacity: 1; }
+        0%,
+        60%,
+        100% {
+          opacity: 0.5;
+        }
+        30% {
+          opacity: 1;
+        }
       }
 
       /* ========================================================================
          CONSENT BANNER - Clear, Respectful, Non-Pressuring
          ======================================================================== */
-      
+
       .consent-banner {
         background: linear-gradient(135deg, var(--pink), var(--purple));
         color: var(--white);
@@ -391,9 +406,13 @@
       /* ========================================================================
          INFO BANNER - Subtle, Informative
          ======================================================================== */
-      
+
       .info-banner {
-        background: linear-gradient(135deg, rgba(255, 45, 149, 0.1), rgba(125, 44, 255, 0.1));
+        background: linear-gradient(
+          135deg,
+          rgba(255, 45, 149, 0.1),
+          rgba(125, 44, 255, 0.1)
+        );
         border-left: 3px solid var(--pink);
         padding: 10px 15px;
         margin: 10px 0;
@@ -409,23 +428,132 @@
         font-size: 11px;
       }
 
+      .mode-toggle {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      .mode-toggle button {
+        padding: 8px 12px;
+        font-size: 12px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.16);
+        color: var(--white);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+
+      .mode-toggle button.active {
+        background: var(--white);
+        color: var(--pink);
+      }
+
+      .mode-toggle .online-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 120px;
+        justify-content: center;
+        font-weight: 700;
+      }
+
+      .mode-toggle .online-toggle .icon {
+        font-size: 14px;
+      }
+
+      .mode-toggle .online-toggle.on {
+        background: linear-gradient(135deg, #2ecc71, #27ae60);
+        color: white;
+        box-shadow: 0 6px 16px rgba(39, 174, 96, 0.25);
+      }
+
+      .mode-toggle .online-toggle.off {
+        background: rgba(255, 255, 255, 0.14);
+        color: rgba(255, 255, 255, 0.9);
+        opacity: 0.8;
+      }
+
+      body.dark-mode {
+        background: linear-gradient(135deg, #0b1020, #101a31, #1d2d50);
+      }
+
+      body.dark-mode .container,
+      body.dark-mode .input-area,
+      body.dark-mode .command-help,
+      body.dark-mode .moxie-widget {
+        background: #16213e;
+        color: #f2f5ff;
+        border-color: #4b5d86;
+      }
+
+      body.dark-mode .message.assistant .message-content {
+        background: #1f2d4c;
+        color: #f2f5ff;
+        border-color: #4b5d86;
+      }
+
+      body.dark-mode .message.user .message-content {
+        background: #7d2cff;
+      }
+
+      body.dark-mode .message.system .message-content {
+        background: #2d1b4e;
+        color: #ff9ec9;
+      }
+
+      body.dark-mode input[type="text"],
+      body.dark-mode textarea {
+        background: #1f2d4c;
+        color: #f2f5ff;
+        border-color: #4b5d86;
+      }
+
+      body.dark-mode .info-banner,
+      body.dark-mode .sherlock-section,
+      body.dark-mode .consent-banner {
+        background: rgba(125, 44, 255, 0.2);
+        color: #f2f5ff;
+      }
+
+      body.dark-mode .sherlock-disclaimer,
+      body.dark-mode .status {
+        color: #c8d2e6;
+      }
+
       /* ========================================================================
          MOXIE COMPANION - Cyan/Pink/Black Neon Paperclip
          ======================================================================== */
-      
+
       #moxie-paperclip {
         position: fixed;
         bottom: 20px;
         right: 20px;
         width: 60px;
         height: 60px;
-        background: linear-gradient(135deg, var(--pink), var(--hot-pink), var(--purple));
+        background: linear-gradient(
+          135deg,
+          var(--pink),
+          var(--hot-pink),
+          var(--purple)
+        );
         border-radius: 18px;
-        clip-path: polygon(0% 0%, 100% 0%, 100% 70%, 70% 70%, 70% 100%, 30% 100%, 30% 70%, 0% 70%);
+        clip-path: polygon(
+          0% 0%,
+          100% 0%,
+          100% 70%,
+          70% 70%,
+          70% 100%,
+          30% 100%,
+          30% 70%,
+          0% 70%
+        );
         z-index: 1000;
         cursor: pointer;
-        box-shadow: 0 15px 40px rgba(0,0,0,.2);
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+        transition:
+          transform 0.3s ease,
+          box-shadow 0.3s ease;
       }
 
       #moxie-paperclip:hover {
@@ -438,20 +566,90 @@
       }
 
       #moxie-paperclip::before {
-        content: '\1F4AC';
+        content: "\1F4AC";
         position: absolute;
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
         font-size: 24px;
         color: white;
-        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
       }
 
       /* ========================================================================
-         COMMAND HELP OVERLAY - Accessible, Clear
+         HELP BUTTON + POPUP - Super Simple Guidance
          ======================================================================== */
-      
+
+      .help-float-button {
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        width: 54px;
+        height: 54px;
+        border-radius: 50%;
+        border: none;
+        background: linear-gradient(135deg, var(--pink), var(--purple));
+        color: var(--white);
+        font-size: 24px;
+        font-weight: 700;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        z-index: 2100;
+        cursor: pointer;
+      }
+
+      .help-float-button:hover {
+        transform: scale(1.05);
+      }
+
+      .help-popup {
+        position: fixed;
+        bottom: 90px;
+        left: 20px;
+        background: var(--cream);
+        border: 1px solid var(--silver);
+        border-radius: var(--radius);
+        padding: 16px;
+        box-shadow: var(--shadow);
+        z-index: 2100;
+        max-width: min(320px, calc(100vw - 40px));
+        width: 100%;
+      }
+
+      .help-popup.hidden {
+        display: none;
+      }
+
+      .help-popup h3 {
+        color: var(--purple);
+        margin-bottom: 10px;
+        font-size: 16px;
+      }
+
+      .help-popup p,
+      .help-popup li {
+        font-size: 13px;
+        line-height: 1.5;
+        color: var(--black);
+      }
+
+      .help-popup ul {
+        padding-left: 18px;
+        margin: 8px 0;
+      }
+
+      .help-popup code {
+        background: var(--silver);
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-family: monospace;
+        color: var(--purple);
+      }
+
+      .help-popup button {
+        margin-top: 10px;
+        padding: 8px 12px;
+      }
+
       .command-help {
         position: fixed;
         top: 50%;
@@ -499,14 +697,14 @@
       /* ========================================================================
          ACCESSIBILITY - High Contrast, Reduced Motion Support
          ======================================================================== */
-      
+
       @media (prefers-contrast: high) {
         :root {
           --pink: #ff0080;
           --purple: #6600ff;
-          --cream: #ffffff;
-          --white: #000000;
-          --black: #ffffff;
+          --cream: #f6e3e3;
+          --white: #ffffff;
+          --black: #080808;
         }
       }
 
@@ -523,20 +721,20 @@
       /* ========================================================================
          RESPONSIVE DESIGN - Works on All Devices
          ======================================================================== */
-      
+
       @media (max-width: 768px) {
         body {
           padding: 10px;
         }
-        
+
         .container {
           height: 95vh;
         }
-        
+
         .message-content {
           max-width: 85%;
         }
-        
+
         #moxie-paperclip {
           width: 50px;
           height: 50px;
@@ -549,29 +747,29 @@
           height: 98vh;
           border-radius: 0;
         }
-        
+
         .header {
           padding: 20px;
         }
-        
+
         .header h1 {
           font-size: 24px;
         }
-        
+
         .message-content {
           max-width: 90%;
         }
-        
+
         #moxie-paperclip {
           width: 45px;
           height: 45px;
           font-size: 18px;
         }
-        
+
         .input-group {
           flex-direction: column;
         }
-        
+
         .input-group button {
           width: 100%;
         }
@@ -581,13 +779,24 @@
   <body>
     <div class="container">
       <div class="header">
-        <h1>🌸 SXWer AI Chat Bot by SXWers</h1>
+        <h1>SXWer AI Chat Bot by SXWers</h1>
         <p>
-          Trauma-informed support tool with Moxie companion. Your pace, your choices.
+          Trauma-informed support tool with Moxie, your desktop companion. Your
+          pace, your choices.
         </p>
         <div class="mode-toggle">
-          <button id="dark-mode-toggle" title="Toggle Dark Mode">🌙</button>
-          <button id="offline-toggle" title="Toggle Offline Mode">💾</button>
+          <button id="dark-mode-toggle" type="button" title="Toggle Dark Mode">
+            Dark mode
+          </button>
+          <button
+            id="offline-toggle"
+            class="online-toggle off"
+            type="button"
+            title="Toggle online/offline mode"
+          >
+            <span class="icon">🌐</span>
+            <span class="label">Offline</span>
+          </button>
         </div>
       </div>
 
@@ -608,7 +817,7 @@
 
         <!-- SHERLOCK SECTION - Integrated from PI_AI with Ethical Guardrails -->
         <div class="sherlock-section">
-          <label>🔍 Sherlock - Username Reconnaissance</label>
+          <label> Sherlock - Username Reconnaissance</label>
           <div class="sherlock-input-group">
             <input
               type="text"
@@ -619,8 +828,9 @@
             <button id="sherlock-btn">Search</button>
           </div>
           <p class="sherlock-disclaimer">
-            <strong>⚠️ Ethical Use Only:</strong> For your own safety verification. 
-            Never use without explicit consent. No surveillance of others.
+            <strong>️ Ethical Use Only:</strong> For your own safety
+            verification. Never use without explicit consent. No surveillance of
+            others.
           </p>
         </div>
 
@@ -629,19 +839,106 @@
     </div>
 
     <!-- Moxie Paperclip Companion -->
-    <div id="moxie-paperclip" title="Click to talk to Moxie"></div>
+    <div
+      id="moxie-paperclip"
+      title="Open Moxie companion"
+      aria-label="Open Moxie companion"
+    ></div>
+
+    <button
+      id="help-float-button"
+      class="help-float-button"
+      type="button"
+      aria-label="Open quick help"
+      title="Open quick help"
+    >
+      ?
+    </button>
+
+    <div
+      id="help-popup"
+      class="help-popup hidden"
+      role="dialog"
+      aria-label="Quick help"
+    >
+      <h3>Quick guide</h3>
+      <p>Use this chat in simple steps:</p>
+      <ul>
+        <li>Type a message in the box and press Send.</li>
+        <li>Use <code>/help</code> to see commands.</li>
+        <li>
+          Use <code>/consent yes</code> or <code>/consent no</code> to control
+          AI help.
+        </li>
+        <li>
+          Use <code>/sherlock username</code> only for your own safety checks.
+        </li>
+        <li>
+          Use <code>/moxie hello</code> to talk with Moxie, your desktop
+          companion.
+        </li>
+      </ul>
+      <p>Your pace, your choices. You can close this anytime.</p>
+      <button id="help-popup-close" type="button">Close</button>
+    </div>
+
+    <!-- Moxie Widget -->
+    <div
+      id="moxie-widget"
+      class="moxie-widget hidden"
+      role="dialog"
+      aria-label="Moxie companion widget"
+    >
+      <div class="moxie-widget-header">
+        <span class="moxie-widget-title">Moxie Companion</span>
+        <button
+          id="moxie-widget-close"
+          class="moxie-widget-close"
+          type="button"
+          aria-label="Close Moxie widget"
+        >
+          ×
+        </button>
+      </div>
+      <div class="moxie-widget-body">
+        <p class="moxie-widget-text">
+          Gentle check-ins, calm reminders, and a steady desktop companion that
+          can stay with you inside this chat or outside it.
+        </p>
+        <div class="moxie-widget-actions">
+          <button id="moxie-widget-chat" type="button">Chat with Moxie</button>
+          <button id="moxie-widget-checkin" type="button">
+            Gentle check-in
+          </button>
+        </div>
+        <div id="moxie-widget-notifications" class="moxie-widget-notifications">
+          <p>Moxie is ready to help.</p>
+        </div>
+      </div>
+    </div>
 
     <!-- Command Help Overlay -->
     <div id="command-help" class="command-help hidden">
       <h3>Available Commands</h3>
       <ul>
-        <li><code>/sherlock username</code> - Check username across platforms (requires <strong>explicit consent</strong> for safety reasons)</li>
-        <li><code>/moxie message</code> - Talk to Moxie companion</li>
+        <li>
+          <code>/sherlock username</code> - Check username across platforms
+          (requires <strong>explicit consent</strong> for safety reasons)
+        </li>
+        <li>
+          <code>/moxie message</code> - Talk to Moxie, your desktop companion
+        </li>
         <li><code>/consent yes</code> - Grant AI consent</li>
         <li><code>/consent no</code> - Revoke AI consent</li>
         <li><code>/help</code> - Show this help</li>
       </ul>
-      <button onclick="document.getElementById('command-help').classList.add('hidden')">Close</button>
+      <button
+        onclick="
+          document.getElementById('command-help').classList.add('hidden')
+        "
+      >
+        Close
+      </button>
     </div>
 
     <script>
@@ -661,85 +958,266 @@
       const chatInput = document.getElementById("chat-input");
       const sendBtn = document.getElementById("send-btn");
       const statusEl = document.getElementById("status");
+      const darkModeToggle = document.getElementById("dark-mode-toggle");
+      const offlineToggle = document.getElementById("offline-toggle");
       const moxieElement = document.getElementById("moxie-paperclip");
+      const moxieWidget = document.getElementById("moxie-widget");
+      const moxieWidgetClose = document.getElementById("moxie-widget-close");
+      const moxieWidgetChatBtn = document.getElementById("moxie-widget-chat");
+      const moxieWidgetCheckinBtn = document.getElementById(
+        "moxie-widget-checkin",
+      );
+      const moxieWidgetNotifications = document.getElementById(
+        "moxie-widget-notifications",
+      );
+      const helpButton = document.getElementById("help-float-button");
+      const helpPopup = document.getElementById("help-popup");
+      const helpPopupClose = document.getElementById("help-popup-close");
       const commandHelp = document.getElementById("command-help");
       const sherlockInput = document.getElementById("sherlock-input");
       const sherlockBtn = document.getElementById("sherlock-btn");
 
       // State
       let consent = { ai: false, tools: false };
+      let localPermissions = { offline: false, grantedAt: null };
       let moxieCheckInInterval = null;
 
       // Moxie Configuration
       const MOXIE_CONFIG = {
-        name: 'Moxie',
+        name: "Moxie",
         colors: {
-          pink: '#ff2d95',
-          hotPink: '#ff4fb4',
-          purple: '#7d2cff',
-          black: '#111111'
+          pink: "#ff2d95",
+          hotPink: "#ff4fb4",
+          purple: "#7d2cff",
+          black: "#111111",
         },
         checkInMessages: [
-          'How are you feeling right now?',
-          'Remember, you\'re in control here.',
-          'Take a breath. I\'m here when you\'re ready.',
-          'Your pace, your choices. Always.',
-          'You\'re doing great. Want to talk about anything?',
-          'This is your space. No judgment, no pressure.',
-          'Gentle reminder: Your dignity and autonomy matter.',
-          'I\'m here to listen without judgment. What\'s on your mind?'
-        ]
+          "How are you feeling right now?",
+          "Remember, you're in control here.",
+          "Take a breath. I'm here when you're ready.",
+          "Your pace, your choices. Always.",
+          "You're doing great. Want to talk about anything?",
+          "This is your space. No judgment, no pressure.",
+          "Gentle reminder: Your dignity and autonomy matter.",
+          "I'm here to listen without judgment. What's on your mind?",
+        ],
       };
 
       // Initialize
       function init() {
         // Load consent from localStorage
-        const savedConsent = localStorage.getItem('sxwer_consent');
+        const savedConsent = localStorage.getItem("sxwer_consent");
         if (savedConsent) {
           try {
             consent = JSON.parse(savedConsent);
           } catch (e) {
-            console.error('Failed to load consent:', e);
+            console.error("Failed to load consent:", e);
+          }
+        }
+
+        // Load offline local permissions from localStorage
+        const savedLocalPermissions = localStorage.getItem(
+          "sxwer_local_permissions",
+        );
+        if (savedLocalPermissions) {
+          try {
+            localPermissions = JSON.parse(savedLocalPermissions);
+          } catch (e) {
+            console.error("Failed to load local permissions:", e);
           }
         }
 
         // Check if offline mode
-        fetch('/api/health')
-          .then(res => res.json())
-          .then(data => {
-            if (data.mode === 'offline') {
+        fetch("/api/health")
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.mode === "offline") {
+              setOnlineToggleState(false);
               showOfflineBanner();
+            } else {
+              setOnlineToggleState(true);
             }
             if (data.model) {
               showModelInfo(data.model);
             }
           })
           .catch(() => {
+            setOnlineToggleState(false);
             showOfflineBanner();
           });
+
+        applySavedTheme();
+        updateModeButtons();
 
         // Start Moxie check-ins
         startMoxieCheckIns();
 
+        darkModeToggle.addEventListener("click", () => {
+          document.body.classList.toggle("dark-mode");
+          updateModeButtons();
+          localStorage.setItem(
+            "sxwer_dark_mode",
+            document.body.classList.contains("dark-mode") ? "1" : "0",
+          );
+        });
+
+        offlineToggle.addEventListener("click", () => {
+          const isOnline = offlineToggle.classList.contains("on");
+          offlineToggle.classList.toggle("on", !isOnline);
+          offlineToggle.classList.toggle("off", isOnline);
+          offlineToggle.querySelector(".label").textContent = isOnline
+            ? "Offline"
+            : "Online";
+          showOfflineBanner(
+            !isOnline ? "Online mode enabled." : "Offline mode enabled.",
+          );
+        });
+
         // Set up Moxie click handler
-        moxieElement.addEventListener('click', () => {
+        moxieElement.addEventListener("click", () => {
+          openMoxieWidget();
+        });
+
+        moxieWidgetClose.addEventListener("click", (event) => {
+          event.stopPropagation();
+          closeMoxieWidget();
+        });
+
+        moxieWidgetChatBtn.addEventListener("click", (event) => {
+          event.stopPropagation();
           const message = prompt(`Talk to ${MOXIE_CONFIG.name}:`);
           if (message) {
             sendMessage(`/moxie ${message}`);
+            showMoxieNotification("Your message was sent to Moxie.");
           }
+        });
+
+        moxieWidgetCheckinBtn.addEventListener("click", (event) => {
+          event.stopPropagation();
+          triggerMoxieCheckIn();
+        });
+
+        helpButton.addEventListener("click", (event) => {
+          event.stopPropagation();
+          helpPopup.classList.toggle("hidden");
+        });
+
+        helpPopupClose.addEventListener("click", (event) => {
+          event.stopPropagation();
+          helpPopup.classList.add("hidden");
         });
 
         // Initial message
         setTimeout(() => {
-          appendMessage('assistant', 
+          appendMessage(
+            "assistant",
             `Hello. I'm here to listen without judgment. This is your space.\n\n` +
-            `You can:\n` +
-            `• Chat with me about anything you're going through\n` +
-            `• Use /sherlock username to check if a username appears across platforms (for your safety)\n` +
-            `• Talk to Moxie, your cyan/pink/black neon paperclip companion\n\n` +
-            `I'm trauma-informed and prioritize your dignity and autonomy. What's on your mind?`
+              `You can:\n` +
+              `• Chat with me about anything you're going through\n` +
+              `• Use /sherlock username to check if a username appears across platforms (for your safety)\n` +
+              `• Talk to Moxie, your desktop companion that can work inside this chat or outside it\n\n` +
+              `I'm trauma-informed and prioritize your dignity and autonomy. What's on your mind?`,
           );
         }, 100);
+      }
+
+      function applySavedTheme() {
+        const savedTheme = localStorage.getItem("sxwer_dark_mode");
+        if (savedTheme === "1") {
+          document.body.classList.add("dark-mode");
+        }
+      }
+
+      function updateModeButtons() {
+        const isDark = document.body.classList.contains("dark-mode");
+        darkModeToggle.classList.toggle("active", isDark);
+        darkModeToggle.textContent = isDark ? "Light mode" : "Dark mode";
+      }
+
+      function setOnlineToggleState(isOnline) {
+        offlineToggle.classList.toggle("on", isOnline);
+        offlineToggle.classList.toggle("off", !isOnline);
+        const label = offlineToggle.querySelector(".label");
+        if (label) {
+          label.textContent = isOnline ? "Online" : "Offline";
+        }
+      }
+
+      function isOfflineMode() {
+        return offlineToggle.classList.contains("off");
+      }
+
+      function saveLocalPermissions() {
+        localStorage.setItem(
+          "sxwer_local_permissions",
+          JSON.stringify(localPermissions),
+        );
+      }
+
+      function showLocalPermissionDialog(scope = "offline") {
+        const dialog = document.createElement("div");
+        dialog.className = "consent-banner";
+        dialog.innerHTML = `
+          <p><strong>Offline local access needs your permission.</strong></p>
+          <p>This app can use local-only data for your safety checks when you are offline.</p>
+          <p>It does not access unrelated device files or personal contacts by default.</p>
+          <p>Do you want to allow local-only access for this session?</p>
+          <button onclick="grantLocalPermissions('${scope}')">Allow local-only access</button>
+          <button onclick="denyLocalPermissions()">No, keep private</button>
+        `;
+        document.querySelector(".input-area").prepend(dialog);
+      }
+
+      function grantLocalPermissions(scope = "offline") {
+        localPermissions = {
+          offline: true,
+          grantedAt: new Date().toISOString(),
+          scope,
+        };
+        saveLocalPermissions();
+        document.querySelector(".consent-banner")?.remove();
+        if (scope === "offline") {
+          setStatus("Offline local access enabled.");
+        }
+      }
+
+      function denyLocalPermissions() {
+        localPermissions = {
+          offline: false,
+          grantedAt: null,
+          scope: "offline",
+        };
+        saveLocalPermissions();
+        document.querySelector(".consent-banner")?.remove();
+        setStatus("Offline local access kept private.");
+      }
+
+      function openMoxieWidget() {
+        if (moxieWidget) {
+          moxieWidget.classList.remove("hidden");
+          helpPopup.classList.add("hidden");
+          commandHelp.classList.add("hidden");
+        }
+      }
+
+      function closeMoxieWidget() {
+        if (moxieWidget) {
+          moxieWidget.classList.add("hidden");
+        }
+      }
+
+      function showMoxieNotification(message) {
+        if (!moxieWidgetNotifications) return;
+        moxieWidgetNotifications.innerHTML = `<p>${String(message).replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>`;
+      }
+
+      function triggerMoxieCheckIn() {
+        const message =
+          MOXIE_CONFIG.checkInMessages[
+            Math.floor(Math.random() * MOXIE_CONFIG.checkInMessages.length)
+          ];
+        appendMessage("moxie", message, false, true);
+        showMoxieNotification("Gentle check-in sent.");
       }
 
       // Start Moxie gentle check-ins
@@ -747,65 +1225,78 @@
         if (moxieCheckInInterval) {
           clearInterval(moxieCheckInInterval);
         }
-        
+
         moxieCheckInInterval = setInterval(() => {
-          if (Math.random() > 0.5) { // 50% chance of check-in
-            const randomIndex = Math.floor(Math.random() * MOXIE_CONFIG.checkInMessages.length);
+          if (Math.random() > 0.5) {
+            // 50% chance of check-in
+            const randomIndex = Math.floor(
+              Math.random() * MOXIE_CONFIG.checkInMessages.length,
+            );
             const message = MOXIE_CONFIG.checkInMessages[randomIndex];
-            appendMessage('moxie', message, false, true);
+            appendMessage("moxie", message, false, true);
+            showMoxieNotification("A gentle reminder arrived from Moxie.");
           }
         }, 120000); // Every 2 minutes
       }
 
       // Show offline banner
-      function showOfflineBanner() {
-        const banner = document.createElement('div');
-        banner.className = 'info-banner';
+      function showOfflineBanner(
+        message = "Offline mode: using local model. No API keys or network required.",
+      ) {
+        const banner = document.createElement("div");
+        banner.className = "info-banner";
         banner.innerHTML = `
-          <span>💾 <strong>Offline Mode:</strong> Using local model. No API keys or network required.</span>
+          <span><strong>Status:</strong> ${message}</span>
           <button onclick="this.parentElement.remove()">Dismiss</button>
         `;
-        document.querySelector('.input-area').prepend(banner);
+        document.querySelector(".input-area").prepend(banner);
       }
 
       // Show model info
       function showModelInfo(modelName) {
-        const banner = document.createElement('div');
-        banner.className = 'info-banner';
+        const banner = document.createElement("div");
+        banner.className = "info-banner";
         banner.innerHTML = `
-          <span>🤖 <strong>Model:</strong> ${modelName} loaded successfully.</span>
+          <span> <strong>Model:</strong> ${modelName} loaded successfully.</span>
           <button onclick="this.parentElement.remove()">Dismiss</button>
         `;
-        document.querySelector('.input-area').prepend(banner);
+        document.querySelector(".input-area").prepend(banner);
       }
 
       // Append message to chat
-      function appendMessage(role, content, isLoading = false, isMoxieCheckIn = false) {
-        const messageDiv = document.createElement('div');
+      function appendMessage(
+        role,
+        content,
+        isLoading = false,
+        isMoxieCheckIn = false,
+      ) {
+        const messageDiv = document.createElement("div");
         messageDiv.className = `message ${role}`;
         if (isMoxieCheckIn) {
-          messageDiv.classList.add('moxie-checkin');
+          messageDiv.classList.add("moxie-checkin");
         }
 
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'message-content';
+        const contentDiv = document.createElement("div");
+        contentDiv.className = "message-content";
 
         if (isLoading) {
-          contentDiv.innerHTML = '<div class="loading-dots"><span>.</span><span>.</span><span>.</span></div>';
+          contentDiv.innerHTML =
+            '<div class="loading-dots"><span>.</span><span>.</span><span>.</span></div>';
         } else if (Array.isArray(content)) {
           // Sanitize array content to prevent XSS
-          const safeContent = content.map(c => 
-            String(c).replace(/</g, '&lt;').replace(/>/g, '&gt;')
-          ).join('<br>');
+          const safeContent = content
+            .map((c) => String(c).replace(/</g, "&lt;").replace(/>/g, "&gt;"))
+            .join("<br>");
           contentDiv.innerHTML = safeContent;
         } else {
           // Format content with line breaks (XSS-safe)
-          const lines = String(content).split('\n');
-          const safeLines = lines.map(line => 
-            line.trim() === '' ? '<br>' : 
-            String(line).replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          const lines = String(content).split("\n");
+          const safeLines = lines.map((line) =>
+            line.trim() === ""
+              ? "<br>"
+              : String(line).replace(/</g, "&lt;").replace(/>/g, "&gt;"),
           );
-          contentDiv.innerHTML = safeLines.join('<br>');
+          contentDiv.innerHTML = safeLines.join("<br>");
         }
 
         messageDiv.appendChild(contentDiv);
@@ -818,9 +1309,9 @@
       // Set status
       function setStatus(text, isError = false, isLoading = false) {
         statusEl.textContent = text;
-        statusEl.className = 'status';
-        if (isError) statusEl.classList.add('error');
-        if (isLoading) statusEl.classList.add('loading');
+        statusEl.className = "status";
+        if (isError) statusEl.classList.add("error");
+        if (isLoading) statusEl.classList.add("loading");
       }
 
       // Send message
@@ -829,70 +1320,75 @@
         if (!messageText) return;
 
         if (text === null) {
-          chatInput.value = '';
+          chatInput.value = "";
         }
 
-        appendMessage('user', messageText);
+        appendMessage("user", messageText);
 
-        const loadingMsg = appendMessage('assistant', '', true);
-        setStatus('Thinking...', false, true);
+        const loadingMsg = appendMessage("assistant", "", true);
+        setStatus("Thinking...", false, true);
 
         try {
-          const response = await fetch('/api/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
+          const response = await fetch("/api/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
               message: messageText,
-              consent: consent
-            })
+              consent: consent,
+              localPermissions: localPermissions,
+            }),
           });
 
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
           const data = await response.json();
           loadingMsg.remove();
-          
+
           // Handle consent response
           if (data.consentGranted) {
             consent = data.consent;
-            localStorage.setItem('sxwer_consent', JSON.stringify(consent));
+            localStorage.setItem("sxwer_consent", JSON.stringify(consent));
           }
           if (data.consentRevoked) {
             consent = data.consent;
-            localStorage.setItem('sxwer_consent', JSON.stringify(consent));
+            localStorage.setItem("sxwer_consent", JSON.stringify(consent));
           }
-          
+
+          if (data.requiresLocalPermission) {
+            showLocalPermissionDialog(data.localPermissionScope || "offline");
+          }
+
           // Handle Sherlock results
           if (data.results) {
             // Server already formatted the response with ethical structure
             // Just display it normally
-            appendMessage('assistant', data.response);
+            appendMessage("assistant", data.response);
           } else {
-            appendMessage('assistant', data.response);
+            appendMessage("assistant", data.response);
           }
-          
+
           // Handle Moxie response
-          if (data.from === 'Moxie') {
-            appendMessage('moxie', data.response);
+          if (data.from === "Moxie") {
+            appendMessage("moxie", data.response);
           }
-          
+
           // Handle consent request
           if (data.requiresConsent) {
             showConsentDialog(data.consentType);
           }
-          
-          setStatus(data.offline ? 'Offline mode - Local responses only' : '');
-          
+
+          setStatus(data.offline ? "Offline mode - Local responses only" : "");
         } catch (error) {
           loadingMsg.remove();
           // Format error with ethical structure
           const errorResponse = {
-            anchor: 'I encountered an error processing your request.',
+            anchor: "I encountered an error processing your request.",
             mirror: `You requested: "${messageText}"`,
-            reframe: 'This might be due to offline mode limitations or a technical issue.',
-            rapport: 'Would you like to try again or use a different approach?'
+            reframe:
+              "This might be due to offline mode limitations or a technical issue.",
+            rapport: "Would you like to try again or use a different approach?",
           };
-          appendMessage('system', Object.values(errorResponse).join('\n\n'));
+          appendMessage("system", Object.values(errorResponse).join("\n\n"));
           setStatus(`Error: ${error.message}`, true);
         } finally {
           if (text === null) {
@@ -906,14 +1402,22 @@
         const input = sherlockInput.value.trim();
         if (!input) return;
 
-        const username = input.split(',').map(u => u.trim()).filter(u => u)[0];
+        const username = input
+          .split(",")
+          .map((u) => u.trim())
+          .filter((u) => u)[0];
         if (!username) return;
 
-        sherlockInput.value = '';
-        
+        sherlockInput.value = "";
+
         // Check if user has given tool consent
         if (!consent.tools) {
-          showConsentDialog('sherlock');
+          showConsentDialog("sherlock");
+          return;
+        }
+
+        if (isOfflineMode() && !localPermissions.offline) {
+          showLocalPermissionDialog("offline");
           return;
         }
 
@@ -923,10 +1427,10 @@
 
       // Show consent dialog
       function showConsentDialog(type) {
-        const dialog = document.createElement('div');
-        dialog.className = 'consent-banner';
-        
-        if (type === 'sherlock') {
+        const dialog = document.createElement("div");
+        dialog.className = "consent-banner";
+
+        if (type === "sherlock") {
           dialog.innerHTML = `
             <p><strong>Sherlock requires your explicit consent.</strong></p>
             <p>This tool searches public social media profiles for safety/verification only.</p>
@@ -947,15 +1451,15 @@
             <button onclick="this.parentElement.remove()">No, cancel</button>
           `;
         }
-        
-        document.querySelector('.input-area').prepend(dialog);
+
+        document.querySelector(".input-area").prepend(dialog);
       }
 
       // Grant Sherlock consent
       function grantSherlockConsent() {
         consent.tools = true;
-        localStorage.setItem('sxwer_consent', JSON.stringify(consent));
-        document.querySelector('.consent-banner').remove();
+        localStorage.setItem("sxwer_consent", JSON.stringify(consent));
+        document.querySelector(".consent-banner").remove();
         // Re-send the last Sherlock request
         const lastSherlock = sherlockInput.value.trim();
         if (lastSherlock) {
@@ -966,49 +1470,80 @@
       // Grant AI consent
       function grantAIConsent() {
         consent.ai = true;
-        localStorage.setItem('sxwer_consent', JSON.stringify(consent));
-        document.querySelector('.consent-banner').remove();
+        localStorage.setItem("sxwer_consent", JSON.stringify(consent));
+        document.querySelector(".consent-banner").remove();
         // Re-send the last message
-        const lastUserMessage = Array.from(document.querySelectorAll('.message.user .message-content'))
-          .pop()?.textContent;
+        const lastUserMessage = Array.from(
+          document.querySelectorAll(".message.user .message-content"),
+        ).pop()?.textContent;
         if (lastUserMessage) {
           sendMessage(lastUserMessage);
         }
       }
 
       // Event Listeners
-      sendBtn.addEventListener('click', () => sendMessage());
-      
-      chatInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
+      sendBtn.addEventListener("click", () => sendMessage());
+
+      const closeCommandHelpButton = document.querySelector(
+        "#command-help button",
+      );
+      if (closeCommandHelpButton) {
+        closeCommandHelpButton.addEventListener("click", (event) => {
+          event.stopPropagation();
+          commandHelp.classList.add("hidden");
+        });
+      }
+
+      chatInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
           e.preventDefault();
           sendMessage();
         }
-        
-        // Show command help on / 
-        if (e.key === '/' && chatInput.value === '/') {
-          commandHelp.classList.remove('hidden');
+
+        // Show command help on /
+        if (e.key === "/" && chatInput.value === "/") {
+          commandHelp.classList.remove("hidden");
         }
       });
 
       // Sherlock button and input
-      sherlockBtn.addEventListener('click', runSherlock);
-      sherlockInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
+      sherlockBtn.addEventListener("click", runSherlock);
+      sherlockInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
           e.preventDefault();
           runSherlock();
         }
       });
 
-      // Hide command help when clicking outside
-      document.addEventListener('click', (e) => {
-        if (!commandHelp.contains(e.target) && e.target !== chatInput) {
-          commandHelp.classList.add('hidden');
+      // Hide help panels when clicking outside
+      document.addEventListener("click", (e) => {
+        if (
+          commandHelp &&
+          !commandHelp.contains(e.target) &&
+          e.target !== chatInput
+        ) {
+          commandHelp.classList.add("hidden");
+        }
+
+        if (
+          helpPopup &&
+          !helpPopup.contains(e.target) &&
+          e.target !== helpButton
+        ) {
+          helpPopup.classList.add("hidden");
+        }
+
+        if (
+          moxieWidget &&
+          !moxieWidget.contains(e.target) &&
+          e.target !== moxieElement
+        ) {
+          moxieWidget.classList.add("hidden");
         }
       });
 
       // Initialize on load
-      window.addEventListener('load', init);
+      window.addEventListener("load", init);
     </script>
 
     <!-- Load additional styles -->

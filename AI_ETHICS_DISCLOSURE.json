@@ -1,0 +1,174 @@
+{
+  "aiEthicsDisclosure": {
+    "title": "AI Ethics Disclosure",
+    "description": "This taxonomy documents categories of information that digital systems may collect or process. Inclusion does not imply that this application collects every category.",
+    "principles": [
+      "Data minimization",
+      "Explicit informed consent",
+      "Human dignity over optimization",
+      "Transparency of collection and processing",
+      "User agency and revocable consent",
+      "Privacy by design",
+      "Local-first processing whenever practical",
+      "No collection without a clearly documented purpose"
+    ],
+    "dataCollectionCategories": [
+      {
+        "id": "identity",
+        "title": "Identity Data",
+        "description": "Information that identifies a person.",
+        "examples": [
+          "Name",
+          "Email address",
+          "Phone number",
+          "Username",
+          "Date of birth",
+          "Government IDs (when required)"
+        ]
+      },
+      {
+        "id": "device",
+        "title": "Device Data",
+        "description": "Information about the device being used.",
+        "examples": [
+          "IP address",
+          "Device model",
+          "Operating system",
+          "Browser version",
+          "Screen resolution",
+          "Language settings",
+          "Time zone"
+        ]
+      },
+      {
+        "id": "location",
+        "title": "Location Data",
+        "description": "Location information depending on permissions and service configuration.",
+        "examples": [
+          "GPS coordinates",
+          "Wi-Fi networks",
+          "Cell tower information",
+          "Approximate location from IP address"
+        ]
+      },
+      {
+        "id": "usage",
+        "title": "Usage Data",
+        "description": "Information describing how users interact with systems.",
+        "examples": [
+          "Pages visited",
+          "Clicks",
+          "Scrolling behavior",
+          "Time spent on pages",
+          "Search queries",
+          "Mouse movement",
+          "Touch interactions"
+        ]
+      },
+      {
+        "id": "technicalLogs",
+        "title": "Technical Logs",
+        "description": "Automatically generated operational logs.",
+        "examples": [
+          "Login attempts",
+          "Error logs",
+          "Crash reports",
+          "API requests",
+          "Network traffic",
+          "System performance metrics"
+        ]
+      },
+      {
+        "id": "behavioral",
+        "title": "Behavioral Data",
+        "description": "Information used for personalization or analytics.",
+        "examples": [
+          "Purchase history",
+          "Viewing history",
+          "Application usage",
+          "Preferences",
+          "Recommendations clicked",
+          "Advertising interactions"
+        ]
+      },
+      {
+        "id": "communications",
+        "title": "Communications",
+        "description": "Communication content when provided by the service.",
+        "examples": [
+          "Emails",
+          "Messages",
+          "Voice recordings",
+          "Video calls",
+          "Attachments"
+        ],
+        "note": "Access depends on system architecture, encryption, permissions, and organizational policy."
+      },
+      {
+        "id": "aiInteractions",
+        "title": "AI Interaction Data",
+        "description": "Information generated through interaction with AI systems.",
+        "examples": [
+          "Prompts",
+          "Responses",
+          "Conversation history",
+          "User feedback",
+          "Safety reports",
+          "Model evaluation data"
+        ],
+        "note": "Retention and use vary by provider, deployment, and user settings."
+      },
+      {
+        "id": "sensors",
+        "title": "Sensor Data",
+        "description": "Information from device sensors when permissions are granted.",
+        "examples": [
+          "Camera",
+          "Microphone",
+          "Accelerometer",
+          "Gyroscope",
+          "Bluetooth",
+          "NFC",
+          "Health sensors"
+        ],
+        "note": "Most operating systems require user permission before access."
+      },
+      {
+        "id": "metadata",
+        "title": "Metadata",
+        "description": "Contextual information describing communications and activity rather than their contents.",
+        "examples": [
+          "Who contacted whom",
+          "When",
+          "Duration",
+          "Location",
+          "Device used",
+          "File sizes",
+          "Timestamps"
+        ],
+        "note": "Metadata can reveal significant behavioral patterns even without access to message content."
+      }
+    ],
+    "infrastructureTelemetry": {
+      "title": "Data Center Infrastructure Monitoring",
+      "description": "Operational telemetry collected to maintain infrastructure reliability, efficiency, and security.",
+      "metrics": [
+        "CPU utilization",
+        "GPU utilization",
+        "Memory usage",
+        "Storage capacity",
+        "Disk failures",
+        "Network throughput",
+        "Temperature",
+        "Humidity",
+        "Airflow",
+        "Water usage",
+        "Electricity consumption",
+        "Carbon emissions",
+        "Physical access logs",
+        "Security camera footage",
+        "Equipment maintenance records"
+      ]
+    }
+  }
+}
