@@ -652,11 +652,9 @@
           
           // Handle Sherlock results
           if (data.results) {
-            const resultsText = data.results.map(r => {
-              const urls = r.websites?.map(w => `• ${w.name}: ${w.url_user}`).join('\n') || 'No profiles found';
-              return `**${r.username}**\n${urls}`;
-            }).join('\n\n');
-            appendMessage('assistant', resultsText);
+            // Server already formatted the response with ethical structure
+            // Just display it normally
+            appendMessage('assistant', data.response);
           } else {
             appendMessage('assistant', data.response);
           }
@@ -675,7 +673,14 @@
           
         } catch (error) {
           loadingMsg.remove();
-          appendMessage('system', `Error: ${error.message}`);
+          // Format error with ethical structure
+          const errorResponse = {
+            anchor: 'I encountered an error processing your request.',
+            mirror: `You requested: "${messageText}"`,
+            reframe: 'This might be due to offline mode limitations or a technical issue.',
+            rapport: 'Would you like to try again or use a different approach?'
+          };
+          appendMessage('system', Object.values(errorResponse).join('\n\n'));
           setStatus(`Error: ${error.message}`, true);
         } finally {
           if (text === null) {
