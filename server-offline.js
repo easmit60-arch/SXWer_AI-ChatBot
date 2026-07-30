@@ -16,6 +16,7 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import resources from './resources.json' assert { type: 'json' };
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -528,6 +529,32 @@ app.get('/moxie.css', (req, res) => {
  * GET /riot-grrrl.css - Serve Riot Grrrl palette
  */
 app.get('/riot-grrrl.css', (req, res) => {
+
+// Offline mode toggle endpoint
+app.post('/api/toggle-offline', (req, res) => {
+  const { offline } = req.body;
+  
+  if (offline) {
+    process.env.OFFLINE_MODE = 'true';
+  } else {
+    process.env.OFFLINE_MODE = 'false';
+  }
+  
+  res.json({
+    success: true,
+    offlineMode: process.env.OFFLINE_MODE === 'true',
+    message: `Switched to ${offline ? 'offline' : 'online'} mode`
+  });
+});
+
+// Get current mode
+app.get('/api/mode', (req, res) => {
+  res.json({
+    offlineMode: process.env.OFFLINE_MODE === 'true',
+    mode: process.env.OFFLINE_MODE === 'true' ? 'offline' : 'online'
+  });
+});
+
   const css = `
     :root {
       /* Riot Grrrl Palette */

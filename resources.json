@@ -21,7 +21,8 @@
         "Safety guides",
         "Regional member directories"
       ],
-      "website": "https://www.nswp.org/"
+      "website": "https://www.nswp.org/",
+      "description": "Global network advocating for the rights of sex workers worldwide. Provides policy briefs, research, and capacity building for sex worker-led organizations."
     },
     {
       "id": 2,
@@ -36,7 +37,8 @@
         "Publications",
         "Tools for sex worker rights and organizing"
       ],
-      "website": "https://www.redumbrellafund.org/"
+      "website": "https://www.redumbrellafund.org/",
+      "description": "The first and only global fund guided by and for sex workers. Provides grants and resources to sex worker-led organizations."
     },
     {
       "id": 3,
@@ -48,7 +50,8 @@
         "Legal support"
       ],
       "members": "32 organizations across 23 countries",
-      "website": "https://www.apnsw.org/"
+      "website": "https://www.apnsw.org/",
+      "description": "Regional network advocating for the rights of sex workers in Asia and the Pacific. Focuses on human rights, health, and legal support."
     },
     {
       "id": 4,
@@ -59,7 +62,8 @@
         "Community mobilization",
         "Anti-violence advocacy"
       ],
-      "website": "https://www.swannetwork.org/"
+      "website": "https://www.swannetwork.org/",
+      "description": "Regional network working to advance the human rights of sex workers in Central and Eastern Europe and Central Asia."
     },
     {
       "id": 5,
@@ -70,13 +74,20 @@
         "HIV/AIDS advocacy",
         "Legal reform"
       ],
-      "website": "https://www.sisonke.org.za/"
+      "website": "https://www.sisonke.org.za/",
+      "description": "South Africa's first sex worker movement by sex workers for sex workers. Focuses on rights, health, and legal reform."
     },
     {
       "id": 6,
       "name": "Women’s Organization Network for Human Rights Advocacy (WONETHA)",
       "region": "Uganda",
-      "website": "https://www.nswp.org/members"
+      "focus": [
+        "Human rights",
+        "Health advocacy",
+        "Legal support"
+      ],
+      "website": "https://www.nswp.org/members",
+      "description": "Ugandan organization advocating for the rights of sex workers, with a focus on human rights, health, and legal support."
     },
     {
       "id": 7,
@@ -87,7 +98,8 @@
         "Financial cooperatives",
         "Advocacy"
       ],
-      "website": "https://www.dmsc.org/"
+      "website": "https://www.dmsc.org/",
+      "description": "Collective of sex workers in West Bengal, India. Runs community-led HIV prevention programs and financial cooperatives."
     },
     {
       "id": 8,
@@ -98,7 +110,8 @@
         "Safety",
         "Legal resources under New Zealand’s decriminalized model"
       ],
-      "website": "https://www.nzpc.org.nz/"
+      "website": "https://www.nzpc.org.nz/",
+      "description": "New Zealand's national organization for sex workers, providing health, safety, and legal resources under decriminalization."
     },
     {
       "id": 9,
@@ -109,7 +122,8 @@
         "Policy change",
         "Alliance-building with migrants and LGBTI+ organizations"
       ],
-      "website": "https://www.sexworkeurope.org/"
+      "website": "https://www.sexworkeurope.org/",
+      "description": "European network advocating for the rights of sex workers, with a focus on policy change and alliance-building."
     },
     {
       "id": 10,
@@ -120,7 +134,8 @@
         "Skill-sharing",
         "Decriminalization advocacy"
       ],
-      "website": "https://www.swarmcollective.org/"
+      "website": "https://www.swarmcollective.org/",
+      "description": "UK-based collective providing peer support, skill-sharing, and advocacy for sex workers' rights and decriminalization."
     },
     {
       "id": 11,
@@ -131,7 +146,8 @@
         "Anti-trafficking (distinct from consensual sex work)",
         "Regional advocacy"
       ],
-      "website": "https://www.redtrasex.org/"
+      "website": "https://www.redtrasex.org/",
+      "description": "Latin American network of sex workers advocating for labor rights, anti-trafficking efforts, and regional advocacy."
     },
     {
       "id": 12,
@@ -142,7 +158,9 @@
         "Legal rights",
         "Crisis support for sex workers"
       ],
-      "website": "https://www.swopusa.org/"
+      "website": "https://www.swopusa.org/",
+      "description": "US-based organization providing harm reduction, legal rights advocacy, and crisis support for sex workers.",
+      "crisis_line": "Text HOME to 741741"
     },
     {
       "id": 13,
@@ -153,7 +171,8 @@
         "Health services",
         "Safety resources"
       ],
-      "website": "https://www.pacesociety.org/"
+      "website": "https://www.pacesociety.org/",
+      "description": "Vancouver-based organization providing peer support, health services, and safety resources for sex workers."
     },
     {
       "id": 14,
@@ -164,7 +183,8 @@
         "STI testing",
         "Mental health support for sex workers"
       ],
-      "website": "https://www.stjamesinfirmary.org/"
+      "website": "https://www.stjamesinfirmary.org/",
+      "description": "San Francisco's occupational health clinic for sex workers, providing STI testing and mental health support."
     },
     {
       "id": 15,
@@ -175,7 +195,8 @@
         "Anti-racism",
         "Migration support for Asian and migrant sex workers"
       ],
-      "website": "https://www.butterflysw.org/"
+      "website": "https://www.butterflysw.org/",
+      "description": "Toronto-based organization supporting Asian and migrant sex workers with labor rights, anti-racism, and migration support."
     },
     {
       "id": 16,
@@ -186,7 +207,8 @@
         "Anti-surveillance tools",
         "Online safety for sex workers"
       ],
-      "website": "https://www.hackinghustling.org/"
+      "website": "https://www.hackinghustling.org/",
+      "description": "Collective providing digital privacy and anti-surveillance tools and resources for sex workers."
     },
     {
       "id": 17,
@@ -196,7 +218,8 @@
         "Free access to zines",
         "Historical documents by/for sex workers"
       ],
-      "website": "https://archive.org/details/sexworkzines"
+      "website": "https://archive.org/details/sexworkzines",
+      "description": "Digital archive of zines and historical documents created by and for sex workers."
     },
     {
       "id": 18,
@@ -207,7 +230,8 @@
         "Rent assistance",
         "Medical bills and safety relocations"
       ],
-      "website": "https://www.swopusa.org/emergency-fund"
+      "website": "https://www.swopusa.org/emergency-fund",
+      "description": "Emergency fund providing small grants for sex workers in crisis, including rent assistance and safety relocations."
     },
     {
       "id": 19,
@@ -217,7 +241,8 @@
         "Fundraising toolkits",
         "Grants for grassroots sex worker organizations, especially in the Global South"
       ],
-      "website": "https://sexworkdonorcollaborative.org/for-sex-workers"
+      "website": "https://sexworkdonorcollaborative.org/for-sex-workers",
+      "description": "Collaborative providing fundraising toolkits and grants for grassroots sex worker organizations."
     },
     {
       "id": 20,
@@ -226,7 +251,8 @@
       "focus": [
         "Comprehensive directory of sex worker rights organizations worldwide"
       ],
-      "website": "https://www.bayswan.org/orgs.html"
+      "website": "https://www.bayswan.org/orgs.html",
+      "description": "Comprehensive directory of sex worker rights organizations from around the world."
     },
     {
       "id": 21,
@@ -237,8 +263,95 @@
         "Health services",
         "Online communities"
       ],
-      "website": "https://worldadultguide.com/for-providers/resources/"
+      "website": "https://worldadultguide.com/for-providers/resources/",
+      "description": "Directory of legal aid, health services, and online communities for sex workers."
     }
-  ]
+  ],
+  "crisis_resources": [
+    {
+      "name": "Crisis Text Line",
+      "description": "24/7 crisis support via text message",
+      "contact": "Text HOME to 741741",
+      "regions": ["US", "UK", "Canada"],
+      "website": "https://www.crisistextline.org"
+    },
+    {
+      "name": "The Trevor Project",
+      "description": "Crisis intervention and suicide prevention for LGBTQ+ youth",
+      "contact": "866-488-7386",
+      "regions": ["US"],
+      "website": "https://www.thetrevorproject.org"
+    },
+    {
+      "name": "Trans Lifeline",
+      "description": "Peer support hotline for trans people",
+      "contact": "877-565-8860 (US) / 877-330-6366 (Canada)",
+      "regions": ["US", "Canada"],
+      "website": "https://www.translifeline.org"
+    },
+    {
+      "name": "National Suicide Prevention Lifeline",
+      "description": "24/7 suicide prevention hotline",
+      "contact": "988 (US) / 1-800-273-TALK",
+      "regions": ["US"],
+      "website": "https://988lifeline.org"
+    }
+  ],
+  "safety_tips": [
+    {
+      "title": "Online Safety",
+      "tips": [
+        "Use strong, unique passwords for all accounts",
+        "Enable two-factor authentication where possible",
+        "Be cautious about sharing personal information online",
+        "Regularly check privacy settings on social media",
+        "Use encrypted messaging apps for sensitive conversations",
+        "Consider using a VPN for additional privacy"
+      ]
+    },
+    {
+      "title": "Physical Safety",
+      "tips": [
+        "Always trust your instincts",
+        "Share your location with a trusted friend",
+        "Have a safety plan in place",
+        "Know local laws and your rights",
+        "Carry protection if legal in your area",
+        "Have emergency contacts saved in your phone"
+      ]
+    },
+    {
+      "title": "Emotional Well-being",
+      "tips": [
+        "Practice self-care regularly",
+        "Connect with supportive communities",
+        "Set boundaries that feel right for you",
+        "Seek professional support when needed",
+        "Remember: your feelings are valid",
+        "You are not alone"
+      ]
+    }
+  ],
+  "legal_rights": {
+    "decriminalization": {
+      "description": "Decriminalization of sex work removes criminal penalties for consensual adult sex work",
+      "countries": ["New Zealand", "Germany", "Netherlands", "Australia (some states)", "Canada (some aspects)"],
+      "benefits": [
+        "Improved access to justice",
+        "Better working conditions",
+        "Reduced stigma and discrimination",
+        "Improved health and safety outcomes"
+      ]
+    },
+    "labor_rights": {
+      "description": "Sex workers have the same labor rights as other workers in many jurisdictions",
+      "rights": [
+        "Right to fair pay",
+        "Right to safe working conditions",
+        "Right to refuse service",
+        "Right to protection from discrimination",
+        "Right to organize and collectively bargain"
+      ]
+    }
+  }
 }
-```

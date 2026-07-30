@@ -2,7 +2,9 @@
 node_modules/
 
 # Local model files (large, don't commit)
+# Exception: README files in models directory are allowed
 models/
+!models/**/README.md
 node-portable/
 
 # Environment files
