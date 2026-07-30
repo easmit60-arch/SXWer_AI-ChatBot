@@ -250,6 +250,26 @@ app.post('/api/chat', async (req, res) => {
       });
     }
     
+
+    // Handle /resources and /help commands
+    if (message === '/resources' || message === '/help') {
+      const response = formatHumanNLP({
+        userInput: message,
+        anchor: 'Here are resources and support organizations for sex workers:',
+        mirror: `You asked: "${message}"`,
+        reframe: 'These organizations provide support, advocacy, and resources:',
+        rapport: 'Type /sherlock username - Check username\n/moxie message - Talk to Moxie\n/consent yes - Enable AI\n/consent no - Disable AI\n/resources - Show this list'
+      });
+      
+      // Include resources in the response
+      return res.json({
+        response: formatResponseForDisplay(response),
+        resources: resources.organizations,
+        crisis_resources: resources.crisis_resources,
+        safety_tips: resources.safety_tips
+      });
+    }
+
     // Check for Moxie command
     if (message && message.startsWith('/moxie ')) {
       const moxieMessage = message.substring(7).trim();
