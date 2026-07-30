@@ -793,13 +793,19 @@
         if (isLoading) {
           contentDiv.innerHTML = '<div class="loading-dots"><span>.</span><span>.</span><span>.</span></div>';
         } else if (Array.isArray(content)) {
-          contentDiv.innerHTML = content.join('<br>');
-        } else {
-          // Format content with line breaks
-          const lines = String(content).split('\n');
-          contentDiv.innerHTML = lines.map(line => 
-            line.trim() === '' ? '<br>' : line
+          // Sanitize array content to prevent XSS
+          const safeContent = content.map(c => 
+            String(c).replace(/</g, '&lt;').replace(/>/g, '&gt;')
           ).join('<br>');
+          contentDiv.innerHTML = safeContent;
+        } else {
+          // Format content with line breaks (XSS-safe)
+          const lines = String(content).split('\n');
+          const safeLines = lines.map(line => 
+            line.trim() === '' ? '<br>' : 
+            String(line).replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          );
+          contentDiv.innerHTML = safeLines.join('<br>');
         }
 
         messageDiv.appendChild(contentDiv);

@@ -22,10 +22,7 @@
   "author": "SXWers",
   "license": "MIT",
   "dependencies": {
-    "express": "^4.21.2",
-    "@mistralai/mistral-src": "^0.1.0",
-    "better-sqlite3": "^9.2.2",
-    "crypto-js": "^4.2.0"
+    "express": "^4.21.2"
   },
   "devDependencies": {
     "nodemon": "^3.1.0"
@@ -33,6 +30,13 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "os": ["win32", "darwin", "linux"],
-  "cpu": ["x64", "arm64"]
+  "os": [
+    "win32",
+    "darwin",
+    "linux"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ]
 }
