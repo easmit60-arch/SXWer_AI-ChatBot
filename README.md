@@ -110,6 +110,126 @@ See [python/README.md](python/README.md) for full setup instructions, including 
 - Keep sensitive values in a local .env file.
 - The app is not a substitute for professional medical, legal, or crisis services.
 
+## Optional blockchain consent ledger
+
+This app includes an **optional, opt-in** cryptographic consent ledger.
+
+### Why it exists
+
+Some users want a tamper-evident audit trail proving that consent was given, revised, or revoked — and when. Blockchain provides immutable, verifiable receipts without requiring trust in any single server.
+
+### What is stored on-chain
+
+Only anonymous, non-reversible consent receipts:
+
+| Field | Description |
+|---|---|
+| `eventType` | e.g. `CONSENT_GRANTED`, `CONSENT_REVOKED` |
+| `documentHash` | SHA-256 hash of the consent document — never the document itself |
+| `receiptHash` | SHA-256 of the full receipt object |
+| `timestamp` | Unix milliseconds |
+| `policyVersion` | Which version of the policy was accepted |
+| `schemaVersion` | Receipt schema version |
+| `appVersion` | Application version |
+| `nonce` | Replay-protection value |
+| `walletId` | Optional pseudonymous identifier |
+| `signature` | Optional digital signature |
+
+### What is **never** stored
+
+Conversation history · prompts · AI responses · user names · emails · phone numbers · GPS · messages · attachments · photos · videos · safety plans · health information · legal records · any PII
+
+### Human Rights by Design
+
+Every blockchain feature must answer YES to all eight questions:
+
+1. **Can the user understand what is happening?** Yes — every event is shown in plain language.
+2. **Can the user meaningfully consent?** Yes — the full disclosure is shown before activation.
+3. **Can the user refuse?** Yes — blockchain is always optional; the app works without it.
+4. **Can they revoke consent?** Yes — the "Revoke Consent" button writes an immutable revocation receipt.
+5. **Can they inspect their data?** Yes — the Consent Ledger page shows every record.
+6. **Can they export it?** Yes — "Export Consent" downloads a portable JSON file.
+7. **Can they delete local data?** Yes — "Disable Blockchain" clears the local ledger.
+8. **Can they continue without blockchain?** Yes — local-first is always the default.
+
+### Privacy architecture
+
+```
+Client
+  ↓
+Consent Manager (consent_manager.js)
+  ↓
+Local Encrypted Storage (IndexedDB / in-memory)
+  ↓ (optional — only when BLOCKCHAIN_ENABLED=true and user has consented)
+Optional Blockchain Ledger (services/blockchain/consentLedger.js)
+  ↓
+Verification Service (services/blockchain/hashService.js)
+```
+
+```mermaid
+flowchart TD
+    A[User] -->|Explicit informed consent| B[Consent Manager]
+    B --> C[Local Encrypted Storage]
+    B -->|Optional, hash only| D[Blockchain Ledger]
+    D --> E[Abstract Provider]
+    E --> F1[Mock / In-memory]
+    E --> F2[Ethereum / Polygon]
+    E --> F3[Hyperledger Fabric]
+    E --> F4[Hedera Hashgraph]
+    E --> F5[Consortium Chain]
+    D --> G[Verification Service]
+    C -->|Never leaves device| H[Conversation / Safety Data]
+```
+
+### Threat model
+
+| Threat | Mitigation |
+|---|---|
+| PII leakage to blockchain | Only SHA-256 hashes of documents are written; raw content never leaves the device |
+| Private key exposure | Keys held only in memory during signing; immediately cleared on disconnect |
+| Provider unavailability | Graceful degradation — app continues offline; receipts retained locally |
+| Silent blockchain activation | `BLOCKCHAIN_ENABLED` defaults to `false`; requires explicit user opt-in |
+| Secrets committed to repo | All keys read from environment variables; `.env` is in `.gitignore` |
+| Receipt tampering | Each receipt includes a hash of its own content; `verifyConsent()` detects modification |
+
+### Consent lifecycle
+
+```
+User opens app (blockchain disabled by default)
+  → User navigates to Consent Ledger page
+  → Full disclosure is displayed
+  → User clicks "I understand — Enable Blockchain"
+  → CONSENT_GRANTED receipt created and submitted
+  → User uses the app normally
+  → User can revoke at any time → CONSENT_REVOKED receipt written
+  → User can export ledger history at any time
+  → User can disable blockchain → local ledger cleared, wallet disconnected
+```
+
+### Data lifecycle
+
+| Data | Storage | Deletable |
+|---|---|---|
+| Consent receipts (local) | In-memory (session) | Yes — "Disable Blockchain" |
+| On-chain consent receipts | Blockchain (if enabled) | Immutable by design (contains no PII) |
+| Conversation history | Local only | Yes — via "Delete my data" |
+| Safety plans | Local only | Yes |
+| Settings | Local only | Yes |
+
+### Enabling blockchain (optional)
+
+1. Read and accept the disclosure on the Consent Ledger page, or set in `.env`:
+
+```
+BLOCKCHAIN_ENABLED=true
+BLOCKCHAIN_PROVIDER=mock   # or ethereum, polygon, hyperledger, hedera, consortium
+```
+
+2. Configure your chosen provider in `.env` (see `.env.example`).
+3. Restart the server.
+
+The app works identically without blockchain. Blockchain adds only an optional audit trail.
+
 ## Copying or sharing the project
 
 To share or copy this chatbot:
@@ -126,5 +246,13 @@ This makes it easy to run as a portable, offline-friendly project. If you want t
 - [index.html](index.html) — chat UI, help popup, dark/light mode, Moxie widget
 - [server-offline.js](server-offline.js) — server routes, offline/online behavior, API endpoints
 - [chatbot.js](chatbot.js) — ethical response logic, consent handling, safety checks
+- [consent_manager.js](consent_manager.js) — session consent and data minimization
+- [services/blockchain/](services/blockchain/) — optional consent ledger (blockchain abstraction)
+  - `ledgerConfig.js` — configuration and event type vocabulary
+  - `hashService.js` — SHA-256 consent document hashing
+  - `walletService.js` — abstract wallet management
+  - `blockchainService.js` — abstract provider interface
+  - `consentLedger.js` — consent recording API
+- [public/consent-ledger.html](public/consent-ledger.html) — Consent Ledger UI (WCAG 2.2 AA)
 - [.env.example](.env.example) — safe example environment configuration
 - [python/](python/) — optional Python microservice (NLP, local LLM, voice, resource tools)

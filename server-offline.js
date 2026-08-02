@@ -29,6 +29,36 @@ import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
 import resources from "./resources.json" with { type: "json" };
+import {
+  recordConsent,
+  revokeConsent,
+  verifyConsent,
+  recordDeletion,
+  recordExport,
+  recordPolicyAcceptance,
+  getConsentHistory,
+  exportLedger,
+  clearLocalLedger,
+  getConsentStatus,
+} from "./services/blockchain/consentLedger.js";
+import { disconnectWallet, getWalletInfo, isWalletConnected } from "./services/blockchain/walletService.js";
+import { BLOCKCHAIN_ENABLED, INFORMED_CONSENT_DISCLOSURE } from "./services/blockchain/ledgerConfig.js";
+import {
+  getServerPublicKeyBase64,
+  getKeyPairMetadata,
+  getServerKeyPair,
+  registerClientPublicKey,
+  getClientPublicKey,
+  removeClientPublicKey,
+} from "./services/crypto/keyManager.js";
+import {
+  encryptMessage,
+  decryptMessage,
+  isValidEnvelope,
+  envelopeSummary,
+} from "./services/crypto/messageEncryption.js";
+import { acceptNonce, clearSessionNonces } from "./services/crypto/replayGuard.js";
+import { ENCRYPTION_DISCLOSURE } from "./services/crypto/cryptoConfig.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -80,7 +110,7 @@ app.use("/api/", limiter);
 
 // Cookie parser for CSRF token handling
 app.use(cookieParser());
-n// Session token management
+// Session token management
 const sessionTokens = new Map();
 
 function generateSessionToken() {
@@ -423,8 +453,8 @@ import {
   truncateForMirror,
   detectBiasInAIResponse,
   createAIExplanation,
-} from "./chatbot.js";
   handleToolRequest,
+} from "./chatbot.js";
 
 // ============================================================================
 // SHERLOCK OFFLINE IMPLEMENTATION
@@ -851,10 +881,7 @@ app.post("/api/chat", validateChatInput, csrfProtection, requireAuth, async (req
         reframe:
           "These organizations provide support, advocacy, and resources:",
         rapport:
-          "Type /sherlock username - Check username (safety verification only)\n/moxie message - Talk to Moxie\n/consent yes - Enable AI
-/get_time - Get current time
-/translate text to language - Translate text
-/sherlock_ai username - AI-enhanced safety verification\n/consent no - Disable AI\n/resources - Show this list",
+          "Type /sherlock username - Check username (safety verification only)\n/moxie message - Talk to Moxie\n/consent yes - Enable AI\n/get_time - Get current time\n/translate text to language - Translate text\n/sherlock_ai username - AI-enhanced safety verification\n/consent no - Disable AI\n/resources - Show this list",
       });
 
       // Include resources in the response
@@ -1092,6 +1119,345 @@ app.post("/api/chat", validateChatInput, csrfProtection, requireAuth, async (req
   }
 });
 
+// ============================================================================
+// E2E ENCRYPTION ENDPOINTS
+// ============================================================================
+
+/**
+ * POST /api/crypto/handshake
+ *
+ * Phase 1 of E2E setup. The client sends its ephemeral public key; the server
+ * stores it (keyed by session) and responds with its own public key.
+ *
+ * Both sides can then independently compute the shared secret using
+ * X25519 Diffie-Hellman — the secret is NEVER transmitted.
+ *
+ * Request body: { clientPublicKey: string (Base64), sessionId?: string }
+ * Response:     { serverPublicKey: string (Base64), schemaVersion, encryption }
+ *
+ * No sensitive data is logged.
+ */
+app.post(
+  "/api/crypto/handshake",
+  csrfProtection,
+  requireAuth,
+  (req, res) => {
+    try {
+      const { clientPublicKey } = req.body;
+      const sessionId = getSessionIdFromRequest(req);
+
+      if (typeof clientPublicKey !== "string" || !clientPublicKey) {
+        return res.status(400).json({
+          error: "clientPublicKey is required and must be a Base64 string",
+        });
+      }
+
+      // Store the client's public key for this session
+      try {
+        registerClientPublicKey(sessionId, clientPublicKey);
+      } catch (keyErr) {
+        return res.status(400).json({
+          error: "Invalid clientPublicKey",
+          details: keyErr.message,
+        });
+      }
+
+      // Clear any stale nonces for this session (fresh handshake = fresh session)
+      clearSessionNonces(sessionId);
+
+      console.log("[CRYPTO] Handshake complete for session (key material not logged).");
+
+      return res.json({
+        serverPublicKey: getServerPublicKeyBase64(),
+        schemaVersion: "sxwer-e2e-v1",
+        encryption: {
+          algorithm: "X25519-XSalsa20-Poly1305",
+          keyExchange: "Diffie-Hellman (ephemeral, per-session)",
+          forwardSecrecy: true,
+          onlineApiNotice: ENCRYPTION_DISCLOSURE.onlineApiNotice,
+        },
+      });
+    } catch (err) {
+      console.error("[CRYPTO] Handshake error:", err.message);
+      return res.status(500).json({ error: "Handshake failed" });
+    }
+  },
+);
+
+/**
+ * GET /api/crypto/server-key
+ *
+ * Returns the server's current public key without requiring a full handshake.
+ * Clients can use this to verify the server key has not changed unexpectedly.
+ */
+app.get("/api/crypto/server-key", (req, res) => {
+  const meta = getKeyPairMetadata();
+  return res.json({
+    serverPublicKey: meta.publicKey,
+    createdAt: meta.createdAt,
+    schemaVersion: "sxwer-e2e-v1",
+  });
+});
+
+/**
+ * GET /api/crypto/disclosure
+ *
+ * Returns the human-readable E2E encryption disclosure document.
+ * Shown to users before they enable encryption.
+ */
+app.get("/api/crypto/disclosure", (req, res) => {
+  return res.json({ disclosure: ENCRYPTION_DISCLOSURE });
+});
+
+/**
+ * POST /api/chat/encrypted
+ *
+ * Encrypted variant of /api/chat.
+ *
+ * The client sends a ciphertext encrypted with the server's public key and
+ * the client's secret key (nacl.box). The server:
+ *   1. Validates the envelope shape.
+ *   2. Checks the nonce for replay attacks.
+ *   3. Decrypts the message using the shared secret.
+ *   4. Processes the plaintext through the existing chatbot pipeline.
+ *   5. Encrypts the response and returns the ciphertext to the client.
+ *
+ * The server NEVER logs the plaintext, the keys, or the nonces.
+ *
+ * Request body:
+ *   {
+ *     ciphertext:      string  // Base64
+ *     nonce:           string  // Base64
+ *     clientPublicKey: string  // Base64 — must match the registered handshake key
+ *     schemaVersion:   string  // must be "sxwer-e2e-v1"
+ *     sessionId?:      string
+ *     consent?:        { ai: boolean, tools: boolean }
+ *     localPermissions?: { offline: boolean, scope: string }
+ *     mode?:           string  // "online" | "offline"
+ *   }
+ *
+ * Response:
+ *   {
+ *     ciphertext: string   // Base64 — encrypted response
+ *     nonce:      string   // Base64 — per-message nonce
+ *     schemaVersion: string
+ *     encrypted:  true
+ *     ...metadata (offline, aiAssisted, etc.)
+ *   }
+ */
+app.post(
+  "/api/chat/encrypted",
+  csrfProtection,
+  requireAuth,
+  async (req, res) => {
+    const sessionId = getSessionIdFromRequest(req);
+
+    try {
+      const envelope = req.body;
+
+      // 1. Validate envelope structure
+      if (!isValidEnvelope(envelope)) {
+        console.warn(
+          "[CRYPTO] Rejected malformed encrypted envelope:",
+          envelopeSummary(envelope),
+        );
+        return res.status(400).json({
+          error: "Invalid encrypted envelope",
+          hint: "Send { ciphertext, nonce, clientPublicKey, schemaVersion }",
+        });
+      }
+
+      if (envelope.schemaVersion !== "sxwer-e2e-v1") {
+        return res.status(400).json({
+          error: `Unsupported schema version: ${envelope.schemaVersion}`,
+          supported: ["sxwer-e2e-v1"],
+        });
+      }
+
+      // 2. Replay protection — reject if nonce was already used
+      if (!acceptNonce(sessionId, envelope.nonce)) {
+        console.warn("[CRYPTO] Replay attack detected for session.");
+        return res.status(400).json({
+          error: "Replay detected: this nonce has already been used",
+        });
+      }
+
+      // 3. Retrieve stored client public key (registered during handshake)
+      const storedClientKey = getClientPublicKey(sessionId);
+      if (!storedClientKey) {
+        return res.status(401).json({
+          error: "No handshake found for this session. Call /api/crypto/handshake first.",
+        });
+      }
+
+      // 4. Verify the clientPublicKey in the envelope matches the registered key
+      const { default: naclUtil } = await import("tweetnacl-util");
+      const { encodeBase64: b64enc, decodeBase64: b64dec } = naclUtil;
+      if (envelope.clientPublicKey !== b64enc(storedClientKey)) {
+        return res.status(401).json({
+          error: "clientPublicKey mismatch: key does not match the registered handshake key",
+        });
+      }
+
+      // 5. Decrypt the message
+      const serverKP = getServerKeyPair();
+      let plaintext;
+      try {
+        const { default: naclUtilInner } = await import("tweetnacl-util");
+        const clientPubKey = naclUtilInner.decodeBase64(envelope.clientPublicKey);
+        plaintext = decryptMessage(
+          envelope.ciphertext,
+          envelope.nonce,
+          clientPubKey,
+          serverKP.secretKey,
+        );
+      } catch (decryptErr) {
+        console.warn("[CRYPTO] Decryption failed:", decryptErr.message);
+        return res.status(400).json({
+          error: "Decryption failed",
+          details: "Message authentication tag did not match. The message may have been tampered with.",
+        });
+      }
+
+      // 6. Process the plaintext through the existing chat pipeline
+      //    Build a fake req.body with the decrypted message so we can reuse
+      //    the existing handler logic inline.
+      const message = sanitizeUserMessage(plaintext);
+      plaintext = null; // clear reference immediately after sanitisation
+
+      const { consent, localPermissions, mode } = envelope;
+      const requestedMode = getRequestedMode(mode);
+      const onlineApiActive = shouldUseOnlineApi(requestedMode);
+
+      if (!message) {
+        return res.status(400).json({ error: "Decrypted message is empty" });
+      }
+      if (message.length > MAX_MESSAGE_LENGTH) {
+        return res.status(400).json({ error: "Message exceeds maximum length" });
+      }
+
+      if (consent && typeof consent === "object") {
+        setUserConsent(consent.ai, consent.tools, sessionId);
+      }
+      if (localPermissions && typeof localPermissions === "object") {
+        setLocalPermissions(sessionId, localPermissions);
+      }
+
+      // Delegate to the existing tool/chat pipeline
+      // (same logic as /api/chat, but we encrypt the response on the way out)
+      const toolResponse = await handleToolRequest(message, {
+        sessionId,
+        hasToolConsent: hasToolConsent(sessionId),
+        formatHumanNLP,
+        truncateForMirror,
+      });
+
+      let responseText;
+      let responseMeta = { encrypted: true };
+
+      if (toolResponse) {
+        responseText = formatResponseForDisplay(toolResponse);
+        responseMeta.isTool = true;
+        responseMeta.tool = toolResponse.tool;
+      } else {
+        const chatResponse = chatbot.processMessage(message, {
+          isSherlockRequest: false,
+          forceLocal: !hasAIConsent(sessionId),
+          sessionId,
+        });
+        responseText = formatResponseForDisplay(chatResponse);
+        responseMeta.offline = !onlineApiActive;
+        responseMeta.online = onlineApiActive;
+      }
+
+      // 7. Encrypt the response for the client
+      const { default: naclUtilResp } = await import("tweetnacl-util");
+      const clientPubKeyBytes = naclUtilResp.decodeBase64(envelope.clientPublicKey);
+      const encryptedResponse = encryptMessage(
+        responseText,
+        clientPubKeyBytes,
+        serverKP.secretKey,
+      );
+
+      return res.json({
+        ...responseMeta,
+        ciphertext: encryptedResponse.ciphertext,
+        nonce: encryptedResponse.nonce,
+        schemaVersion: encryptedResponse.schemaVersion,
+      });
+    } catch (err) {
+      console.error("[CRYPTO] Encrypted chat error:", err.message);
+
+      // Return an encrypted error if possible, otherwise fall back to plaintext
+      const clientKey = getClientPublicKey(sessionId);
+      if (clientKey) {
+        try {
+          const serverKP = getServerKeyPair();
+          const encryptedErr = encryptMessage(
+            "An error occurred processing your encrypted message. Please try again.",
+            clientKey,
+            serverKP.secretKey,
+          );
+          return res.status(500).json({
+            encrypted: true,
+            ciphertext: encryptedErr.ciphertext,
+            nonce: encryptedErr.nonce,
+            schemaVersion: encryptedErr.schemaVersion,
+          });
+        } catch {
+          // Fall through to plaintext error
+        }
+      }
+
+      return res.status(500).json({ error: "Encrypted chat processing failed" });
+    }
+  },
+);
+
+/**
+ * POST /api/crypto/rotate-client-key
+ *
+ * Called by the client when it rotates its key pair.
+ * Clears the old client key and nonce records for the session so the client
+ * can register a new public key via /api/crypto/handshake.
+ */
+app.post(
+  "/api/crypto/rotate-client-key",
+  csrfProtection,
+  requireAuth,
+  (req, res) => {
+    const sessionId = getSessionIdFromRequest(req);
+    removeClientPublicKey(sessionId);
+    clearSessionNonces(sessionId);
+    console.log("[CRYPTO] Client key rotation acknowledged for session.");
+    return res.json({
+      rotated: true,
+      message: "Client key cleared. Call /api/crypto/handshake to register your new key.",
+    });
+  },
+);
+
+/**
+ * GET /api/crypto/status
+ *
+ * Returns the server's current encryption status metadata.
+ * Never includes private key material.
+ */
+app.get("/api/crypto/status", requireAuth, (req, res) => {
+  const sessionId = getSessionIdFromRequest(req);
+  const meta = getKeyPairMetadata();
+  const hasClientKey = getClientPublicKey(sessionId) !== null;
+  return res.json({
+    serverPublicKey: meta.publicKey,
+    serverKeyCreatedAt: meta.createdAt,
+    serverKeyAgeMs: meta.ageMs,
+    sessionHasHandshake: hasClientKey,
+    schemaVersion: "sxwer-e2e-v1",
+    algorithm: "X25519-XSalsa20-Poly1305",
+    forwardSecrecy: true,
+  });
+});
+
 /**
  * GET /api/python-status - Python microservice availability and features
  */
@@ -1246,10 +1612,235 @@ app.get("/api/health", (req, res) => {
 });
 
 /**
+ * GET /api/session
+ *
+ * Creates an authenticated session and returns the session token together
+ * with a CSRF token. The browser should call this once on page load (or when
+ * the session has expired) before making any state-mutating API requests,
+ * including the E2E encrypted chat endpoint.
+ *
+ * The CSRF token is derived from a signed cookie set by this response; the
+ * browser must include it as the `x-csrf-token` header on all POST requests.
+ *
+ * Response: { token: string, csrfToken: string }
+ */
+app.get("/api/session", csrfProtection, (req, res) => {
+  const { token, sessionId: newSessionId } = createSession();
+  return res.json({
+    token,
+    sessionId: newSessionId,
+    csrfToken: req.csrfToken(),
+  });
+});
+
+/**
+ * GET /encryption-status - Serve Encryption Status UI page
+ */
+app.get("/encryption-status", limiter, (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "encryption-status.html"));
+});
+
+/**
  * GET / - Serve main HTML
  */
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
+});
+
+/**
+ * GET /consent-ledger - Serve Consent Ledger UI page
+ */
+app.get("/consent-ledger", limiter, (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "consent-ledger.html"));
+});
+
+// ============================================================================
+// CONSENT LEDGER API ROUTES
+//
+// All routes are read-only except POST routes which require an authenticated
+// session.  The ledger API is intentionally available whether or not blockchain
+// is enabled — it always reflects local in-memory state.
+// ============================================================================
+
+/**
+ * GET /api/ledger/status
+ * Return the current consent status summary.
+ */
+app.get("/api/ledger/status", (req, res) => {
+  try {
+    const status = getConsentStatus();
+    const wallet = getWalletInfo();
+    res.json({
+      ...status,
+      walletConnected: isWalletConnected(),
+      walletId: wallet ? wallet.walletId : null,
+      providerName: BLOCKCHAIN_ENABLED ? "configured" : "none",
+      verificationStatus: "not-run",
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Could not read ledger status.", details: err.message });
+  }
+});
+
+/**
+ * GET /api/ledger/history
+ * Return all consent receipts from the local in-memory ledger.
+ */
+app.get("/api/ledger/history", (req, res) => {
+  try {
+    const receipts = getConsentHistory();
+    res.json({ receipts, total: receipts.length });
+  } catch (err) {
+    res.status(500).json({ error: "Could not read ledger history.", details: err.message });
+  }
+});
+
+/**
+ * GET /api/ledger/disclosure
+ * Return the full informed-consent disclosure text for the blockchain feature.
+ */
+app.get("/api/ledger/disclosure", (req, res) => {
+  res.json(INFORMED_CONSENT_DISCLOSURE);
+});
+
+/**
+ * GET /api/ledger/export
+ * Return a portable export package of all local consent records.
+ */
+app.get("/api/ledger/export", (req, res) => {
+  try {
+    const pkg = exportLedger();
+    res.json(pkg);
+  } catch (err) {
+    res.status(500).json({ error: "Export failed.", details: err.message });
+  }
+});
+
+/**
+ * GET /api/ledger/verify
+ * Verify the integrity of all local consent receipts.
+ */
+app.get("/api/ledger/verify", (req, res) => {
+  try {
+    const receipts = getConsentHistory();
+    let verified = 0;
+    let invalid = 0;
+
+    for (const receipt of receipts) {
+      const result = verifyConsent(receipt);
+      if (result.valid) { verified++; } else { invalid++; }
+    }
+
+    res.json({
+      verified,
+      invalid,
+      total: receipts.length,
+      allValid: invalid === 0,
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Verification failed.", details: err.message });
+  }
+});
+
+/**
+ * POST /api/ledger/consent
+ * Record a consent-granted event.
+ */
+app.post("/api/ledger/consent", csrfProtection, requireAuth, async (req, res) => {
+  try {
+    const { policyVersion, consentText } = req.body || {};
+    const receipt = await recordConsent({ policyVersion, consentText });
+    res.json({ success: true, receipt });
+  } catch (err) {
+    res.status(500).json({ error: "Could not record consent.", details: err.message });
+  }
+});
+
+/**
+ * POST /api/ledger/revoke
+ * Record a consent-revoked event.
+ */
+app.post("/api/ledger/revoke", csrfProtection, requireAuth, async (req, res) => {
+  try {
+    const receipt = await revokeConsent(req.body || {});
+    res.json({ success: true, receipt });
+  } catch (err) {
+    res.status(500).json({ error: "Could not revoke consent.", details: err.message });
+  }
+});
+
+/**
+ * POST /api/ledger/record-export
+ * Record that a data export was performed.
+ */
+app.post("/api/ledger/record-export", csrfProtection, requireAuth, async (req, res) => {
+  try {
+    const receipt = await recordExport(req.body || {});
+    res.json({ success: true, receipt });
+  } catch (err) {
+    res.status(500).json({ error: "Could not record export.", details: err.message });
+  }
+});
+
+/**
+ * POST /api/ledger/record-deletion
+ * Record that local data was deleted.
+ */
+app.post("/api/ledger/record-deletion", csrfProtection, requireAuth, async (req, res) => {
+  try {
+    const receipt = await recordDeletion(req.body || {});
+    res.json({ success: true, receipt });
+  } catch (err) {
+    res.status(500).json({ error: "Could not record deletion.", details: err.message });
+  }
+});
+
+/**
+ * POST /api/ledger/policy-acceptance
+ * Record that the user accepted a specific policy version.
+ */
+app.post("/api/ledger/policy-acceptance", csrfProtection, requireAuth, async (req, res) => {
+  try {
+    const { policyVersion, policyDocumentText } = req.body || {};
+    if (!policyVersion) {
+      return res.status(400).json({ error: "policyVersion is required." });
+    }
+    const receipt = await recordPolicyAcceptance(policyVersion, policyDocumentText);
+    res.json({ success: true, receipt });
+  } catch (err) {
+    res.status(500).json({ error: "Could not record policy acceptance.", details: err.message });
+  }
+});
+
+/**
+ * POST /api/ledger/wallet/disconnect
+ * Disconnect the current wallet and clear key material from memory.
+ */
+app.post("/api/ledger/wallet/disconnect", csrfProtection, requireAuth, (req, res) => {
+  const disconnected = disconnectWallet();
+  res.json({ success: true, disconnected });
+});
+
+/**
+ * POST /api/ledger/blockchain/disable
+ * Disable blockchain support for this session.
+ * On-chain records (if any) are immutable and unaffected.
+ * Local ledger is cleared.
+ */
+app.post("/api/ledger/blockchain/disable", csrfProtection, requireAuth, async (req, res) => {
+  try {
+    // Record a BLOCKCHAIN_DISABLED event before clearing
+    await revokeConsent({ context: "blockchain_disabled" });
+    disconnectWallet();
+    const cleared = clearLocalLedger();
+    res.json({
+      success: true,
+      message: "Blockchain disabled. Local ledger cleared. Wallet disconnected.",
+      recordsCleared: cleared,
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Could not disable blockchain.", details: err.message });
+  }
 });
 
 /**

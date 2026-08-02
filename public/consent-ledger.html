@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Consent Ledger — view, verify, and manage your cryptographic consent receipts." />
+  <title>Consent Ledger — SXWer AI</title>
+  <link rel="stylesheet" href="consent-ledger.css" />
+</head>
+<body>
+  <!-- Skip-navigation link for keyboard and screen-reader users -->
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+
+  <header role="banner" class="site-header">
+    <nav aria-label="Site navigation">
+      <a href="/" class="nav-home">← Back to Chat</a>
+    </nav>
+    <h1>Consent Ledger</h1>
+    <p class="header-tagline">
+      Your cryptographic consent audit trail — only hashes, never personal data.
+    </p>
+  </header>
+
+  <main id="main-content" role="main">
+
+    <!-- ================================================================== -->
+    <!-- STATUS BANNER                                                       -->
+    <!-- ================================================================== -->
+    <section aria-labelledby="status-heading" class="card status-card">
+      <h2 id="status-heading">Current Status</h2>
+
+      <dl class="status-grid" aria-label="Consent and blockchain status">
+        <div class="status-item">
+          <dt>Consent active</dt>
+          <dd id="status-consent" aria-live="polite">—</dd>
+        </div>
+        <div class="status-item">
+          <dt>Blockchain enabled</dt>
+          <dd id="status-blockchain" aria-live="polite">—</dd>
+        </div>
+        <div class="status-item">
+          <dt>Wallet connected</dt>
+          <dd id="status-wallet" aria-live="polite">—</dd>
+        </div>
+        <div class="status-item">
+          <dt>Policy version</dt>
+          <dd id="status-policy" aria-live="polite">—</dd>
+        </div>
+        <div class="status-item">
+          <dt>Consent granted</dt>
+          <dd id="status-granted-at" aria-live="polite">—</dd>
+        </div>
+        <div class="status-item">
+          <dt>Consent revoked</dt>
+          <dd id="status-revoked-at" aria-live="polite">—</dd>
+        </div>
+        <div class="status-item">
+          <dt>Exports recorded</dt>
+          <dd id="status-export-count" aria-live="polite">—</dd>
+        </div>
+        <div class="status-item">
+          <dt>Deletions recorded</dt>
+          <dd id="status-deletion-count" aria-live="polite">—</dd>
+        </div>
+        <div class="status-item">
+          <dt>Total ledger records</dt>
+          <dd id="status-total-records" aria-live="polite">—</dd>
+        </div>
+        <div class="status-item">
+          <dt>Verification status</dt>
+          <dd id="status-verify" aria-live="polite">—</dd>
+        </div>
+      </dl>
+    </section>
+
+    <!-- ================================================================== -->
+    <!-- ACTION BUTTONS                                                      -->
+    <!-- ================================================================== -->
+    <section aria-labelledby="actions-heading" class="card actions-card">
+      <h2 id="actions-heading">Actions</h2>
+
+      <div class="button-group" role="group" aria-label="Consent ledger actions">
+        <button type="button" id="btn-view-consent" class="btn btn-primary">
+          View Consent
+        </button>
+        <button type="button" id="btn-export-consent" class="btn btn-secondary">
+          Export Consent
+        </button>
+        <button type="button" id="btn-verify-ledger" class="btn btn-secondary">
+          Verify Ledger
+        </button>
+        <button type="button" id="btn-revoke-consent" class="btn btn-danger">
+          Revoke Consent
+        </button>
+        <button type="button" id="btn-disconnect-wallet" class="btn btn-secondary">
+          Disconnect Wallet
+        </button>
+        <button type="button" id="btn-disable-blockchain" class="btn btn-danger">
+          Disable Blockchain
+        </button>
+      </div>
+
+      <!-- Live region for action results -->
+      <div
+        id="action-result"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        class="action-result"
+      ></div>
+    </section>
+
+    <!-- ================================================================== -->
+    <!-- BLOCKCHAIN DISCLOSURE (shown before any blockchain action)         -->
+    <!-- ================================================================== -->
+    <section aria-labelledby="disclosure-heading" class="card disclosure-card" id="disclosure-section" hidden>
+      <h2 id="disclosure-heading">Blockchain Consent Disclosure</h2>
+      <div id="disclosure-body" class="disclosure-body" aria-live="polite"></div>
+      <div class="button-group disclosure-actions">
+        <button type="button" id="btn-disclosure-accept" class="btn btn-primary">
+          I understand — Enable Blockchain
+        </button>
+        <button type="button" id="btn-disclosure-decline" class="btn btn-secondary">
+          No thank you — Keep Offline
+        </button>
+      </div>
+    </section>
+
+    <!-- ================================================================== -->
+    <!-- LEDGER HISTORY TABLE                                               -->
+    <!-- ================================================================== -->
+    <section aria-labelledby="history-heading" class="card history-card">
+      <h2 id="history-heading">Consent History</h2>
+
+      <div class="table-wrapper" tabindex="0" aria-label="Consent history table, scrollable">
+        <table aria-label="Consent receipts" id="ledger-table">
+          <caption class="visually-hidden">
+            Cryptographic consent receipts. Each row shows an event type, timestamp,
+            receipt ID, and whether the receipt has been verified.
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Event</th>
+              <th scope="col">Timestamp</th>
+              <th scope="col">Receipt ID</th>
+              <th scope="col">On-chain</th>
+              <th scope="col">Valid</th>
+            </tr>
+          </thead>
+          <tbody id="ledger-tbody">
+            <tr>
+              <td colspan="5" class="empty-state">
+                No consent records yet. Records appear here after consent actions.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ================================================================== -->
+    <!-- RECEIPT DETAIL PANEL                                               -->
+    <!-- ================================================================== -->
+    <section
+      aria-labelledby="receipt-detail-heading"
+      class="card receipt-detail-card"
+      id="receipt-detail"
+      hidden
+    >
+      <h2 id="receipt-detail-heading">Receipt Detail</h2>
+      <button type="button" id="btn-close-detail" class="btn btn-ghost close-btn" aria-label="Close receipt detail">✕</button>
+      <pre id="receipt-detail-body" class="receipt-json" aria-label="Receipt JSON"></pre>
+    </section>
+
+    <!-- ================================================================== -->
+    <!-- HUMAN RIGHTS NOTICE                                                -->
+    <!-- ================================================================== -->
+    <section aria-labelledby="rights-heading" class="card rights-card">
+      <h2 id="rights-heading">Your Rights</h2>
+      <ul>
+        <li><strong>Understand:</strong> Every event above is explained in plain language.</li>
+        <li><strong>Consent:</strong> Blockchain is never activated without your explicit, informed agreement.</li>
+        <li><strong>Refuse:</strong> You can decline blockchain entirely without losing any app features.</li>
+        <li><strong>Revoke:</strong> Use "Revoke Consent" above at any time.</li>
+        <li><strong>Inspect:</strong> The full ledger is visible in the table above.</li>
+        <li><strong>Export:</strong> Use "Export Consent" to download a portable copy.</li>
+        <li><strong>Delete local data:</strong> Use "Disable Blockchain" to clear local records.</li>
+        <li><strong>Continue offline:</strong> The app works completely without blockchain.</li>
+      </ul>
+    </section>
+
+  </main>
+
+  <footer role="contentinfo" class="site-footer">
+    <p>
+      SXWer AI — Local-first, privacy-first, human-rights by design.
+      <a href="/" class="footer-link">Back to Chat</a>
+    </p>
+  </footer>
+
+  <script src="consent-ledger.js" type="module"></script>
+</body>
+</html>

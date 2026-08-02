@@ -9,6 +9,7 @@
     "start:usb": "OFFLINE_MODE=true node server-offline.js",
     "dev": "nodemon server-offline.js",
     "test": "node --test",
+    "test:a11y": "node --test tests/accessibility.test.js",
     "bundle": "npm install --production && npm prune --production",
     "bundle:usb": "npm run bundle && echo 'Copy entire directory to USB drive'"
   },
@@ -30,10 +31,15 @@
     "dotenv": "^17.4.2",
     "express": "^4.21.2",
     "express-rate-limit": "^8.6.1",
-    "helmet": "^7.1.0"
+    "helmet": "^7.1.0",
+    "tweetnacl": "^1.0.3",
+    "tweetnacl-util": "^0.15.1"
   },
   "devDependencies": {
-    "nodemon": "^3.1.0"
+    "axe-core": "^4.12.1",
+    "jsdom": "^30.0.1",
+    "nodemon": "^3.1.0",
+    "pa11y": "^9.1.1"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -46,5 +52,8 @@
   "cpu": [
     "x64",
     "arm64"
-  ]
+  ],
+  "allowScripts": {
+    "puppeteer@24.43.1": true
+  }
 }
