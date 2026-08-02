@@ -882,7 +882,14 @@
       </div>
 
       <div class="chat-area">
-        <div id="messages" class="messages" aria-live="polite">
+        <div
+          id="messages"
+          class="messages"
+          role="log"
+          aria-live="polite"
+          aria-relevant="additions text"
+          aria-atomic="false"
+        >
           <div class="message assistant">
             <div class="message-content">
               Hello. I'm here to listen without judgment. This is your space.
@@ -907,6 +914,7 @@
             id="chat-input"
             placeholder="Type your message here... (/sherlock username, /moxie hi, /help)"
             autocomplete="off"
+            aria-label="Chat message"
           />
           <button id="send-btn">Send</button>
         </div>
@@ -920,6 +928,7 @@
               id="sherlock-input"
               placeholder="Enter username to check across platforms"
               autocomplete="off"
+              aria-label="Sherlock username"
             />
             <button id="sherlock-btn">Search</button>
           </div>
@@ -939,6 +948,8 @@
       id="moxie-paperclip"
       title="Open Moxie companion"
       aria-label="Open Moxie companion"
+      role="button"
+      tabindex="0"
     ></div>
 
     <button
@@ -955,11 +966,11 @@
       id="help-popup"
       class="help-popup hidden"
       role="dialog"
-      aria-label="Quick help"
+      aria-labelledby="help-popup-title"
       aria-modal="true"
       tabindex="-1"
     >
-      <h3>Quick guide</h3>
+      <h3 id="help-popup-title">Quick guide</h3>
       <p>Use this chat in simple steps:</p>
       <ul>
         <li>Type a message in the box and press Send.</li>
@@ -1017,8 +1028,8 @@
     </div>
 
     <!-- Command Help Overlay -->
-    <div id="command-help" class="command-help hidden" role="dialog" aria-modal="true" tabindex="-1">
-      <h3>Available Commands</h3>
+    <div id="command-help" class="command-help hidden" role="dialog" aria-modal="true" aria-labelledby="command-help-title" tabindex="-1">
+      <h3 id="command-help-title">Available Commands</h3>
       <ul>
         <li>
           <code>/sherlock username</code> - Check username across platforms
@@ -1118,6 +1129,8 @@
       let pendingSherlockUsername = "";
       // Stores the online AI model name received from /api/health
       let onlineModelName = "mistral-small-latest";
+      let supportsRequestedOnlineMode = true;
+      let onlineApiConfigured = false;
       const SESSION_STORAGE_KEY = "sxwer_session_id";
       const sessionId = getOrCreateSessionId();
 
@@ -1195,11 +1208,21 @@
             if (data.onlineModel) {
               onlineModelName = data.onlineModel;
             }
+            supportsRequestedOnlineMode = Boolean(data.supportsRequestedOnlineMode);
+            onlineApiConfigured = Boolean(data.onlineApiConfigured);
             if (data.mode === "offline") {
               setOnlineToggleState(false);
               showOfflineBanner();
             } else {
               setOnlineToggleState(true);
+            }
+            const canUseOnlineToggle = supportsRequestedOnlineMode && onlineApiConfigured;
+            offlineToggle.disabled = !canUseOnlineToggle;
+            if (!canUseOnlineToggle) {
+              setOnlineToggleState(false);
+              offlineToggle.title = supportsRequestedOnlineMode
+                ? "Online mode unavailable: configure Mistral API key."
+                : "Online mode disabled by server policy.";
             }
             if (data.model) {
               showModelInfo(data.model);
@@ -1239,6 +1262,9 @@
         });
 
         offlineToggle.addEventListener("click", () => {
+          if (offlineToggle.disabled) {
+            return;
+          }
           const isOnline = offlineToggle.classList.contains("on");
           if (isOnline) {
             // Switching from online → offline: no disclosure needed
@@ -1256,6 +1282,12 @@
         // Set up Moxie click handler
         moxieElement.addEventListener("click", () => {
           openMoxieWidget();
+        });
+        moxieElement.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            openMoxieWidget();
+          }
         });
 
         moxieWidgetClose.addEventListener("click", (event) => {
@@ -1725,13 +1757,7 @@
         consent.ai = true;
         localStorage.setItem("sxwer_consent", JSON.stringify(consent));
         dialog?.remove();
-        // Re-send the last message
-        const lastUserMessage = Array.from(
-          document.querySelectorAll(".message.user .message-content"),
-        ).pop()?.textContent;
-        if (lastUserMessage) {
-          sendMessage(lastUserMessage);
-        }
+        setStatus("AI consent granted. Send a message when you're ready.");
       }
 
       // Event Listeners

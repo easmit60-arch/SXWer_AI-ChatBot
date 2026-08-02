@@ -75,6 +75,7 @@ const DEFAULT_LOCAL_PERMISSIONS = Object.freeze({
   scope: "offline",
 });
 const localPermissionStore = new Map();
+const pendingSherlockStore = new Map();
 
 function resolveSessionId(sessionId = "default") {
   const normalized = String(sessionId || "default").trim();
@@ -118,6 +119,14 @@ function getRequestedMode(mode = "offline") {
 
 function shouldAllowOnlineMode(requestedMode) {
   return !OFFLINE_MODE && requestedMode === "online";
+}
+
+function shouldUseOnlineApi(requestedMode) {
+  return (
+    shouldAllowOnlineMode(requestedMode) &&
+    ONLINE_API_ENABLED &&
+    Boolean(MISTRAL_API_KEY)
+  );
 }
 
 /**
@@ -448,6 +457,7 @@ app.post("/api/chat", async (req, res) => {
     const sessionId = getSessionIdFromRequest(req);
     const requestedMode = getRequestedMode(mode);
     const onlineModeAllowed = shouldAllowOnlineMode(requestedMode);
+    const onlineApiActive = shouldUseOnlineApi(requestedMode);
 
     // Update consent if provided
     if (consent && typeof consent === "object") {
@@ -500,6 +510,7 @@ app.post("/api/chat", async (req, res) => {
       }
 
       if (!protocolCheck.allowed || !hasToolConsent(sessionId)) {
+        pendingSherlockStore.set(sessionId, username);
         const response = requestSherlockConsent(username);
         return res.json({
           response: formatResponseForDisplay(response),
@@ -571,7 +582,53 @@ app.post("/api/chat", async (req, res) => {
       (message.toLowerCase() === "yes" ||
         message.toLowerCase() === "/consent yes")
     ) {
-      setUserConsent(true, true, sessionId);
+      const pendingSherlockUsername = pendingSherlockStore.get(sessionId) || null;
+      if (pendingSherlockUsername) {
+        setUserConsent(hasAIConsent(sessionId), true, sessionId);
+        pendingSherlockStore.delete(sessionId);
+
+        if (requestedMode === "offline" && !hasOfflineLocalPermission(sessionId)) {
+          return res.json({
+            response: formatResponseForDisplay(
+              formatHumanNLP({
+                userInput: message,
+                anchor: "Sherlock consent saved.",
+                mirror: `You said: "${message}"`,
+                reframe:
+                  "I still need local-only permission before running the offline Sherlock check.",
+                rapport:
+                  "Would you like to allow local-only access for this offline session?",
+              }),
+            ),
+            requiresLocalPermission: true,
+            localPermissionScope: "offline",
+            consentGranted: true,
+            consent: getConsentState(sessionId),
+            consentType: "sherlock",
+          });
+        }
+
+        const results = offlineSherlockSearch([pendingSherlockUsername]);
+        const sherlockResponse = formatHumanNLP({
+          userInput: `/sherlock ${pendingSherlockUsername}`,
+          anchor: "Consent confirmed and Sherlock search completed (offline mode).",
+          mirror: `You confirmed consent for: "${pendingSherlockUsername}"`,
+          reframe: `Here are the results from local database: ${JSON.stringify(results.results)}. ${results.disclaimer}`,
+          rapport:
+            "Would you like help interpreting these results or planning next steps?",
+        });
+
+        return res.json({
+          response: formatResponseForDisplay(sherlockResponse),
+          results: results.results,
+          offline: true,
+          consentGranted: true,
+          consent: getConsentState(sessionId),
+          consentType: "sherlock",
+        });
+      } else {
+        setUserConsent(true, true, sessionId);
+      }
       const response = formatHumanNLP({
         userInput: message,
         anchor: "Thank you for your consent.",
@@ -585,6 +642,7 @@ app.post("/api/chat", async (req, res) => {
         response: formatResponseForDisplay(response),
         consentGranted: true,
         consent: getConsentState(sessionId),
+        consentType: pendingSherlockUsername ? "sherlock" : "ai",
       });
     }
 
@@ -595,6 +653,7 @@ app.post("/api/chat", async (req, res) => {
         message.toLowerCase() === "/consent no")
     ) {
       setUserConsent(false, false, sessionId);
+      pendingSherlockStore.delete(sessionId);
       const response = formatHumanNLP({
         userInput: message,
         anchor: "Consent revoked.",
@@ -661,7 +720,7 @@ app.post("/api/chat", async (req, res) => {
       }
 
       // 2. External Mistral API (online mode only)
-      if (onlineModeAllowed && MISTRAL_API_KEY) {
+      if (onlineApiActive) {
         try {
           const aiText = await callOnlineModel(message);
           const onlineResponse = buildOnlineResponse(message, aiText);
@@ -687,8 +746,8 @@ app.post("/api/chat", async (req, res) => {
     const displayResponse = formatResponseForDisplay(response);
     return res.json({
       response: displayResponse,
-      offline: !onlineModeAllowed,
-      online: onlineModeAllowed && Boolean(MISTRAL_API_KEY),
+      offline: !onlineApiActive,
+      online: onlineApiActive,
       model: localModel?.name || null,
       nlp: pythonNlp,
     });

@@ -16,13 +16,13 @@ const serverOffline = fs.readFileSync(
 test("offline permissions UI exposes explicit local access choices", () => {
   assert.match(indexHtml, /Allow local-only access/i);
   assert.match(indexHtml, /No, keep private/i);
-  assert.match(indexHtml, /offline local permissions/i);
+  assert.match(indexHtml, /Offline local access needs your permission/i);
 });
 
 test("chat UI renders an initial assistant message in the messages container", () => {
   assert.match(
     indexHtml,
-    /<div id="messages" class="messages"[^>]*>\s*<div class="message assistant">\s*<div class="message-content">/i,
+    /<div[\s\S]*id="messages"[\s\S]*class="messages"[\s\S]*>\s*<div class="message assistant">\s*<div class="message-content">/i,
   );
   assert.match(indexHtml, /Hello\. I'm here to listen without judgment\./i);
 });
@@ -30,4 +30,28 @@ test("chat UI renders an initial assistant message in the messages container", (
 test("server exposes a local-permissions endpoint and gating", () => {
   assert.match(serverOffline, /\/api\/local-permissions/i);
   assert.match(serverOffline, /requiresLocalPermission/i);
+});
+
+test("sherlock consent flow stores pending usernames and returns consent type", () => {
+  assert.match(serverOffline, /pendingSherlockStore\s*=\s*new Map\(\)/i);
+  assert.match(serverOffline, /pendingSherlockStore\.set\(sessionId,\s*username\)/i);
+  assert.match(serverOffline, /consentType:\s*"sherlock"/i);
+});
+
+test("online mode is only active when server policy and API config allow it", () => {
+  assert.match(serverOffline, /function shouldUseOnlineApi\(requestedMode\)/i);
+  assert.match(serverOffline, /offline:\s*!onlineApiActive/i);
+  assert.match(serverOffline, /online:\s*onlineApiActive/i);
+});
+
+test("chat log and controls include accessibility attributes", () => {
+  assert.match(indexHtml, /id="messages"[\s\S]*role="log"/i);
+  assert.match(indexHtml, /aria-relevant="additions text"/i);
+  assert.match(indexHtml, /id="moxie-paperclip"[\s\S]*role="button"/i);
+  assert.match(indexHtml, /id="moxie-paperclip"[\s\S]*tabindex="0"/i);
+});
+
+test("granting AI consent does not auto-resend the prior message", () => {
+  assert.doesNotMatch(indexHtml, /sendMessage\(lastUserMessage\)/i);
+  assert.match(indexHtml, /AI consent granted\. Send a message when you're ready\./i);
 });
