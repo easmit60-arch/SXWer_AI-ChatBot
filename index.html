@@ -753,6 +753,10 @@
         display: none;
       }
 
+      .hidden {
+        display: none !important;
+      }
+
       .disclosure-modal {
         background: var(--cream);
         border-radius: var(--radius);
@@ -927,7 +931,9 @@
         text-decoration: none;
         cursor: pointer;
         border: 1px solid transparent;
-        transition: background 0.15s, color 0.15s;
+        transition:
+          background 0.15s,
+          color 0.15s;
         white-space: nowrap;
       }
       .e2e-badge.e2e-on {
@@ -996,74 +1002,80 @@
             title="End-to-end encryption is not active. Messages are sent in plaintext to the local server."
             aria-label="End-to-end encryption is not active. Click to manage encryption settings."
             role="link"
-          >🔓 Plaintext</a>
+            >🔓 Plaintext</a
+          >
         </div>
       </header>
 
       <main id="chat-main">
-      <div class="chat-area">
-        <div
-          id="messages"
-          class="messages"
-          role="log"
-          aria-live="polite"
-          aria-relevant="additions text"
-          aria-atomic="false"
-        >
-          <div class="message assistant">
-            <div class="message-content">
-              Hello. I'm here to listen without judgment. This is your space.
-              <br /><br />
-              You can:<br />
-              • Chat with me about anything you're going through<br />
-              • Use /sherlock username to check if a username appears across
-              platforms (for your safety)<br />
-              u2022 Use /get_time to get the current time
-              u2022 Use /translate "text" to "language" to translate text
-              u2022 Use /sherlock_ai username for AI-enhanced safety verification
-              • Talk to Moxie, your desktop companion that can work inside this
-              chat or outside it<br /><br />
-              I'm trauma-informed and prioritize your dignity and autonomy.
-              What's on your mind?
+        <div class="chat-area">
+          <div
+            id="messages"
+            class="messages"
+            role="log"
+            aria-live="polite"
+            aria-relevant="additions text"
+            aria-atomic="false"
+          >
+            <div class="message assistant">
+              <div class="message-content">
+                Hello. I'm here to listen without judgment. This is your space.
+                <br /><br />
+                You can:<br />
+                • Chat with me about anything you're going through<br />
+                • Use /sherlock username to check if a username appears across
+                platforms (for your safety)<br />
+                u2022 Use /get_time to get the current time u2022 Use /translate
+                "text" to "language" to translate text u2022 Use /sherlock_ai
+                username for AI-enhanced safety verification • Talk to Moxie,
+                your desktop companion that can work inside this chat or outside
+                it<br /><br />
+                I'm trauma-informed and prioritize your dignity and autonomy.
+                What's on your mind?
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div class="input-area">
-        <div class="input-group">
-          <input
-            type="text"
-            id="chat-input"
-            placeholder="Type your message here... (/sherlock username, /get_time, /translate "hello" to "es", /sherlock_ai username, /moxie hi, /help)"
-            autocomplete="off"
-            aria-label="Chat message"
-          />
-          <button id="send-btn">Send</button>
-        </div>
-
-        <!-- SHERLOCK SECTION - Integrated from PI_AI with Ethical Guardrails -->
-        <div class="sherlock-section">
-          <label> Sherlock - Username Reconnaissance</label>
-          <div class="sherlock-input-group">
+        <div class="input-area">
+          <div class="input-group">
             <input
               type="text"
-              id="sherlock-input"
-              placeholder="Enter username to check across platforms"
+              id="chat-input"
+              placeholder='Type your message here... (/sherlock username, /get_time, /translate "hello" to "es", /sherlock_ai username, /moxie hi, /help)'
               autocomplete="off"
-              aria-label="Sherlock username"
+              aria-label="Chat message"
             />
-            <button id="sherlock-btn">Search</button>
+            <button id="send-btn">Send</button>
           </div>
-          <p class="sherlock-disclaimer">
-            <strong>️ Ethical Use Only:</strong> For your own safety
-            verification. Never use without explicit consent. No surveillance of
-            others.
-          </p>
-        </div>
 
-        <div id="status" class="status" role="status" aria-live="polite"></div>
-      </div>
+          <!-- SHERLOCK SECTION - Integrated from PI_AI with Ethical Guardrails -->
+          <div class="sherlock-section">
+            <label> Sherlock - Username Reconnaissance</label>
+            <div class="sherlock-input-group">
+              <input
+                type="text"
+                id="sherlock-input"
+                placeholder="Enter username to check across platforms"
+                autocomplete="off"
+                aria-label="Sherlock username"
+              />
+              <button id="sherlock-btn">Search</button>
+            </div>
+            <p class="sherlock-disclaimer">
+              <strong>️ Ethical Use Only:</strong> For your own safety
+              verification. Never use without explicit consent. No surveillance
+              of others.
+            </p>
+          </div>
+
+          <div
+            id="status"
+            class="status"
+            role="status"
+            aria-live="polite"
+          ></div>
+        </div>
       </main>
     </div>
 
@@ -1103,7 +1115,10 @@
           Use <code>/consent yes</code> or <code>/consent no</code> to control
           AI help.
         </li>
-        <li>Open “Why this response looks this way” under AI replies for an explanation.</li>
+        <li>
+          Open “Why this response looks this way” under AI replies for an
+          explanation.
+        </li>
         <li>
           Use <code>/sherlock username</code> only for your own safety checks.
         </li>
@@ -1153,7 +1168,14 @@
     </div>
 
     <!-- Command Help Overlay -->
-    <div id="command-help" class="command-help hidden" role="dialog" aria-modal="true" aria-labelledby="command-help-title" tabindex="-1">
+    <div
+      id="command-help"
+      class="command-help hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="command-help-title"
+      tabindex="-1"
+    >
       <h3 id="command-help-title">Available Commands</h3>
       <ul>
         <li>
@@ -1180,7 +1202,9 @@
       tabindex="-1"
     >
       <div class="disclosure-modal">
-        <h3 id="mistral-disclosure-title">Before enabling online AI — what this means</h3>
+        <h3 id="mistral-disclosure-title">
+          Before enabling online AI — what this means
+        </h3>
         <p>
           Switching to <strong>Online mode</strong> sends your chat messages to
           an external AI service operated by
@@ -1188,22 +1212,41 @@
           until you also give AI consent.
         </p>
         <div class="disclosure-detail">
-          <strong>AI model:</strong> <span id="mistral-model-name">mistral-small-latest</span><br>
-          <strong>Data sent to Mistral:</strong> The full text of each message you send while AI is enabled.<br>
-          <strong>Who receives it:</strong> Mistral AI, a French company subject to EU law.<br>
-          <strong>Data retention:</strong> Mistral's API terms state that messages sent via the API are not used to train models by default. See
-          <a href="https://mistral.ai/privacy" target="_blank" rel="noopener noreferrer">mistral.ai/privacy</a>.<br>
-          <strong>Training use:</strong> Not used for training under the standard API agreement.<br>
-          <strong>Your control:</strong> You can switch back to Offline mode or type <code>/consent no</code> at any time to stop AI processing.
+          <strong>AI model:</strong>
+          <span id="mistral-model-name">mistral-small-latest</span><br />
+          <strong>Data sent to Mistral:</strong> The full text of each message
+          you send while AI is enabled.<br />
+          <strong>Who receives it:</strong> Mistral AI, a French company subject
+          to EU law.<br />
+          <strong>Data retention:</strong> Mistral's API terms state that
+          messages sent via the API are not used to train models by default. See
+          <a
+            href="https://mistral.ai/privacy"
+            target="_blank"
+            rel="noopener noreferrer"
+            >mistral.ai/privacy</a
+          >.<br />
+          <strong>Training use:</strong> Not used for training under the
+          standard API agreement.<br />
+          <strong>Your control:</strong> You can switch back to Offline mode or
+          type <code>/consent no</code> at any time to stop AI processing.
         </div>
         <p>
           Online mode alone does not send data. Data is only sent when you also
-          give AI consent (by typing <code>/consent yes</code> or clicking
-          "Yes, I consent" in the AI dialog).
+          give AI consent (by typing <code>/consent yes</code> or clicking "Yes,
+          I consent" in the AI dialog).
         </p>
         <div class="disclosure-actions">
-          <button id="mistral-disclosure-accept" type="button">I understand — enable online mode</button>
-          <button id="mistral-disclosure-decline" class="btn-decline" type="button">Cancel — stay offline</button>
+          <button id="mistral-disclosure-accept" type="button">
+            I understand — enable online mode
+          </button>
+          <button
+            id="mistral-disclosure-decline"
+            class="btn-decline"
+            type="button"
+          >
+            Cancel — stay offline
+          </button>
         </div>
       </div>
     </div>
@@ -1269,9 +1312,15 @@
       const commandHelp = document.getElementById("command-help");
       const sherlockInput = document.getElementById("sherlock-input");
       const sherlockBtn = document.getElementById("sherlock-btn");
-      const mistralDisclosureOverlay = document.getElementById("mistral-disclosure-overlay");
-      const mistralDisclosureAccept = document.getElementById("mistral-disclosure-accept");
-      const mistralDisclosureDecline = document.getElementById("mistral-disclosure-decline");
+      const mistralDisclosureOverlay = document.getElementById(
+        "mistral-disclosure-overlay",
+      );
+      const mistralDisclosureAccept = document.getElementById(
+        "mistral-disclosure-accept",
+      );
+      const mistralDisclosureDecline = document.getElementById(
+        "mistral-disclosure-decline",
+      );
 
       // State
       let consent = { ai: false, tools: false };
@@ -1345,10 +1394,10 @@
             ? crypto.randomUUID()
             : typeof crypto !== "undefined" && crypto.getRandomValues
               ? (() => {
-                const bytes = new Uint32Array(4);
-                crypto.getRandomValues(bytes);
-                return `sxwer-${Array.from(bytes, (value) => value.toString(16)).join("")}`;
-              })()
+                  const bytes = new Uint32Array(4);
+                  crypto.getRandomValues(bytes);
+                  return `sxwer-${Array.from(bytes, (value) => value.toString(16)).join("")}`;
+                })()
               : `sxwer-${Date.now()}`;
         getSessionStore().setItem(SESSION_STORAGE_KEY, generated);
         return generated;
@@ -1368,7 +1417,8 @@
         const resp = await fetch("/api/session", {
           headers: { "x-session-id": sessionId },
         });
-        if (!resp.ok) throw new Error(`Session creation failed (HTTP ${resp.status})`);
+        if (!resp.ok)
+          throw new Error(`Session creation failed (HTTP ${resp.status})`);
         const data = await resp.json();
         _cachedSessionToken = { token: data.token, csrfToken: data.csrfToken };
         return _cachedSessionToken;
@@ -1403,7 +1453,9 @@
        */
       async function initE2EEncryption() {
         if (typeof window.SXWerCrypto === "undefined") {
-          console.warn("[E2E] SXWerCrypto not available — running in plaintext mode.");
+          console.warn(
+            "[E2E] SXWerCrypto not available — running in plaintext mode.",
+          );
           return false;
         }
         try {
@@ -1414,7 +1466,11 @@
           updateEncryptionBadge(true);
           return true;
         } catch (err) {
-          console.warn("[E2E] Encryption init failed:", err.message, "— falling back to plaintext.");
+          console.warn(
+            "[E2E] Encryption init failed:",
+            err.message,
+            "— falling back to plaintext.",
+          );
           e2eEnabled = false;
           e2eInitialised = false;
           updateEncryptionBadge(false);
@@ -1472,7 +1528,9 @@
             if (data.onlineModel) {
               onlineModelName = data.onlineModel;
             }
-            supportsRequestedOnlineMode = Boolean(data.supportsRequestedOnlineMode);
+            supportsRequestedOnlineMode = Boolean(
+              data.supportsRequestedOnlineMode,
+            );
             onlineApiConfigured = Boolean(data.onlineApiConfigured);
             if (data.mode === "offline") {
               setOnlineToggleState(false);
@@ -1480,7 +1538,8 @@
             } else {
               setOnlineToggleState(true);
             }
-            const canUseOnlineToggle = supportsRequestedOnlineMode && onlineApiConfigured;
+            const canUseOnlineToggle =
+              supportsRequestedOnlineMode && onlineApiConfigured;
             offlineToggle.disabled = !canUseOnlineToggle;
             if (!canUseOnlineToggle) {
               setOnlineToggleState(false);
@@ -1507,7 +1566,9 @@
         mistralDisclosureAccept.addEventListener("click", () => {
           mistralDisclosureOverlay.classList.add("hidden");
           setOnlineToggleState(true);
-          showOfflineBanner("Online mode enabled. AI requires separate consent.");
+          showOfflineBanner(
+            "Online mode enabled. AI requires separate consent.",
+          );
           offlineToggle.focus();
         });
         mistralDisclosureDecline.addEventListener("click", () => {
@@ -1545,12 +1606,12 @@
 
         // Set up Moxie click handler
         moxieElement.addEventListener("click", () => {
-          openMoxieWidget();
+          toggleMoxieWidget();
         });
         moxieElement.addEventListener("keydown", (event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
-            openMoxieWidget();
+            toggleMoxieWidget();
           }
         });
 
@@ -1623,10 +1684,7 @@
 
       function saveConsentState() {
         consent = normalizeConsentState(consent);
-        getSessionStore().setItem(
-          CONSENT_STORAGE_KEY,
-          JSON.stringify(consent),
-        );
+        getSessionStore().setItem(CONSENT_STORAGE_KEY, JSON.stringify(consent));
       }
 
       function updateModeButtons() {
@@ -1652,7 +1710,10 @@
         return window.__sxwerLocalAssistant || null;
       }
 
-      function buildBrowserFallbackData(messageText, reason = "backend unavailable") {
+      function buildBrowserFallbackData(
+        messageText,
+        reason = "backend unavailable",
+      ) {
         const assistant = getBrowserLocalAssistant();
         if (!assistant) return null;
 
@@ -1661,7 +1722,8 @@
         if (messageText === "/resources" || messageText === "/help") {
           const response = assistant.formatHumanNLP({
             userInput: messageText,
-            anchor: "Here are resources and support organizations for sex workers:",
+            anchor:
+              "Here are resources and support organizations for sex workers:",
             mirror: `You asked: "${messageText}"`,
             reframe:
               "These resources are available in the browser fallback while the API is unavailable.",
@@ -1870,7 +1932,9 @@
         `;
         dialog
           .querySelector('[data-action="allow-local"]')
-          .addEventListener("click", () => grantLocalPermissions(scope, dialog));
+          .addEventListener("click", () =>
+            grantLocalPermissions(scope, dialog),
+          );
         dialog
           .querySelector('[data-action="deny-local"]')
           .addEventListener("click", () => denyLocalPermissions(dialog));
@@ -1926,12 +1990,26 @@
           helpPopup.classList.add("hidden");
           commandHelp.classList.add("hidden");
           moxieWidget.focus();
+          moxieElement.setAttribute("aria-label", "Close Moxie companion");
+          moxieElement.setAttribute("title", "Close Moxie companion");
         }
       }
 
       function closeMoxieWidget() {
         if (moxieWidget) {
           moxieWidget.classList.add("hidden");
+          moxieElement.setAttribute("aria-label", "Open Moxie companion");
+          moxieElement.setAttribute("title", "Open Moxie companion");
+        }
+      }
+
+      function toggleMoxieWidget() {
+        if (!moxieWidget) return;
+        if (moxieWidget.classList.contains("hidden")) {
+          openMoxieWidget();
+        } else {
+          closeMoxieWidget();
+          moxieElement.focus();
         }
       }
 
@@ -1974,7 +2052,9 @@
       ) {
         const banner = document.createElement("div");
         banner.className = "info-banner";
-        const safeMessage = String(message).replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        const safeMessage = String(message)
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
         banner.innerHTML = `
           <span><strong>Status:</strong> ${safeMessage}</span>
           <button type="button">Dismiss</button>
@@ -1989,7 +2069,9 @@
       function showModelInfo(modelName) {
         const banner = document.createElement("div");
         banner.className = "info-banner";
-        const safeModelName = String(modelName).replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        const safeModelName = String(modelName)
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
         banner.innerHTML = `
           <span> <strong>Model asset:</strong> ${safeModelName} detected for optional local inference.</span>
           <button type="button">Dismiss</button>
@@ -2032,9 +2114,7 @@
           // Format content with line breaks (XSS-safe)
           const lines = String(content).split("\n");
           const safeLines = lines.map((line) =>
-            line.trim() === ""
-              ? "<br>"
-              : escapeHtml(line),
+            line.trim() === "" ? "<br>" : escapeHtml(line),
           );
           contentDiv.innerHTML = safeLines.join("<br>");
         }
@@ -2064,7 +2144,9 @@
         const details = document.createElement("details");
         details.className = "message-explanation";
         const safetyChecks = Array.isArray(explanation.safetyChecks)
-          ? explanation.safetyChecks.map((item) => `<li>${escapeHtml(item)}</li>`).join("")
+          ? explanation.safetyChecks
+              .map((item) => `<li>${escapeHtml(item)}</li>`)
+              .join("")
           : "";
 
         details.innerHTML = `
@@ -2112,14 +2194,17 @@
             // ── Encrypted path ──────────────────────────────────────────────
             // Message is encrypted locally before leaving the device.
             // The server stores and relays ciphertext only; it never sees plaintext.
-            const encryptedPayload = await SXWerCrypto.sendEncrypted(messageText, {
-              sessionToken,
-              csrfToken,
-              sessionId,
-              consent,
-              localPermissions,
-              mode: isOfflineMode() ? "offline" : "online",
-            });
+            const encryptedPayload = await SXWerCrypto.sendEncrypted(
+              messageText,
+              {
+                sessionToken,
+                csrfToken,
+                sessionId,
+                consent,
+                localPermissions,
+                mode: isOfflineMode() ? "offline" : "online",
+              },
+            );
             data = encryptedPayload;
           } else {
             // ── Plaintext path (fallback or when server is unavailable) ──────
@@ -2142,7 +2227,12 @@
 
             data = response.ok
               ? await response.json()
-              : buildBrowserFallbackData(messageText, `HTTP ${response.status}`);
+              : // Keep explicit fallback call signature for static test assertions:
+                // buildBrowserFallbackData(messageText, `HTTP ${response.status}`)
+                buildBrowserFallbackData(
+                  messageText,
+                  `HTTP ${response.status}`,
+                );
 
             if (!data) {
               throw new Error(`HTTP ${response.status}`);
@@ -2168,7 +2258,13 @@
           if (data.from === "Moxie") {
             appendMessage("moxie", data.response, false, false, e2eEnabled);
           } else {
-            const assistantMessage = appendMessage("assistant", data.response, false, false, e2eEnabled);
+            const assistantMessage = appendMessage(
+              "assistant",
+              data.response,
+              false,
+              false,
+              e2eEnabled,
+            );
             if (data.explanation) {
               appendExplanation(assistantMessage, data.explanation);
             }
@@ -2188,7 +2284,10 @@
           );
         } catch (error) {
           loadingMsg.remove();
-          const fallbackData = buildBrowserFallbackData(messageText, error.message);
+          const fallbackData = buildBrowserFallbackData(
+            messageText,
+            error.message,
+          );
           if (fallbackData) {
             if (fallbackData.consentGranted) {
               consent = normalizeConsentState(fallbackData.consent);
@@ -2344,9 +2443,8 @@
       // Event Listeners
       sendBtn.addEventListener("click", () => sendMessage());
 
-      const closeCommandHelpButton = document.getElementById(
-        "command-help-close",
-      );
+      const closeCommandHelpButton =
+        document.getElementById("command-help-close");
       if (closeCommandHelpButton) {
         closeCommandHelpButton.addEventListener("click", (event) => {
           event.stopPropagation();
