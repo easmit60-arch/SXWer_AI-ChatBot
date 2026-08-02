@@ -32,6 +32,10 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+# Security constants
+MAX_AUDIO_SIZE = 10 * 1024 * 1024  # 10MB max audio file size
+ALLOWED_AUDIO_TYPES = {"audio/wav", "audio/x-wav"}
+
 VOSK_MODEL_PATH = os.getenv("VOSK_MODEL_PATH", "./models/vosk-model")
 TTS_ENGINE = os.getenv("TTS_ENGINE", "pyttsx3")
 MIMIC3_URL = os.getenv("MIMIC3_URL", "http://localhost:59125")
@@ -79,8 +83,15 @@ def transcribe_audio(audio_bytes: bytes) -> str:
 
     Raises:
         RuntimeError: If Vosk is not installed or the model is missing.
-        ValueError:   If the audio format is not 16 kHz mono 16-bit PCM.
+        ValueError:   If the audio format is not 16 kHz mono 16-bit PCM or file is too large.
     """
+    # Validate file size
+    if len(audio_bytes) > MAX_AUDIO_SIZE:
+        raise ValueError(
+            f"Audio file too large. Maximum size: {MAX_AUDIO_SIZE // (1024*1024)}MB. "
+            f"Received: {len(audio_bytes) // (1024*1024)}MB."
+        )
+
     if not VOSK_AVAILABLE or _vosk_model is None:
         raise RuntimeError(
             "Vosk STT is not available. "

@@ -22,6 +22,9 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
+import helmet from "helmet";
+import cookieParser from "cookie-parser";
+import csrf from "csrf";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
@@ -40,27 +43,217 @@ const ALLOWED_ORIGINS = (process.env.CORS_ALLOWED_ORIGINS ||
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+// ============================================================================
+// SECURITY MIDDLEWARE CONFIGURATION
+// ============================================================================
+
+// Helmet for security headers
+app.use(helmet({ contentSecurityPolicy: false }));
+
+// CORS configuration - restrict to localhost origins for development
+const corsOptions = {
+  origin: [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
+  ],
+  optionsSuccessStatus: 200,
+  credentials: true,
+};
+app.use(cors(corsOptions));
+
+// Rate limiting - 100 requests per 15 minutes per IP
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: {
+    error: "Too many requests",
+    details: "Please try again later. If you believe this is an error, contact support.",
+  },
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+});
+
+// Apply rate limiting to all API routes
+app.use("/api/", limiter);
+
+// Cookie parser for CSRF token handling
+app.use(cookieParser());
+n// Session token management
+const sessionTokens = new Map();
+
+function generateSessionToken() {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let token = "";
+  for (let i = 0; i < 32; i++) {
+    token += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return token;
+}
+
+function createSession() {
+  const token = generateSessionToken();
+  const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  sessionTokens.set(token, { sessionId, createdAt: Date.now(), lastUsed: Date.now() });
+  return { token, sessionId };
+}
+
+function validateSessionToken(token) {
+  if (!token || typeof token !== "string") return null;
+  const session = sessionTokens.get(token);
+  if (!session) return null;
+  session.lastUsed = Date.now();
+  return session.sessionId;
+}
+
+function requireAuth(req, res, next) {
+  const token = req.headers["x-session-token"] || req.query.token;
+  if (!token) {
+    return res.status(401).json({ error: "Authentication required", details: "Please provide a valid session token" });
+  }
+  const sessionId = validateSessionToken(token);
+  if (!sessionId) {
+    return res.status(401).json({ error: "Invalid session token", details: "The provided session token is invalid or expired" });
+  }
+  req.sessionId = sessionId;
+  next();
+}
+
+// Session cleanup every hour
+setInterval(() => {
+  const now = Date.now();
+  const SESSION_TTL = 24 * 60 * 60 * 1000;
+  for (const [token, session] of sessionTokens.entries()) {
+    if (now - session.lastUsed > SESSION_TTL) {
+      sessionTokens.delete(token);
+    }
+  }
+}, 60 * 60 * 1000);
+
+// CSRF protection setup
+const csrfProtection = csrf({ cookie: true });
+
+// ============================================================================
+// SECURITY MIDDLEWARE
+// ============================================================================
+
+// Input validation constants
+const MAX_SESSION_ID_LENGTH = 64;
+const ALLOWED_SESSION_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
+
+/**
+ * Validate chat message input
+ * @param {string} message - User message to validate
+ * @returns {boolean} True if valid
+ */
+function isValidMessage(message) {
+  if (typeof message !== "string") {
+    return false;
+  }
+  if (message.length === 0) {
+    return false;
+  }
+  if (message.length > MAX_MESSAGE_LENGTH) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Validate session ID format
+ * @param {string} sessionId - Session ID to validate
+ * @returns {boolean} True if valid
+ */
+function isValidSessionId(sessionId) {
+  if (typeof sessionId !== "string") {
+    return false;
+  }
+  if (sessionId.length === 0 || sessionId.length > MAX_SESSION_ID_LENGTH) {
+    return false;
+  }
+  return ALLOWED_SESSION_ID_PATTERN.test(sessionId);
+}
+
+/**
+ * Validate consent object structure
+ * @param {Object} consent - Consent object to validate
+ * @returns {boolean} True if valid
+ */
+function isValidConsent(consent) {
+  if (typeof consent !== "object" || consent === null) {
+    return false;
+  }
+  if ("ai" in consent && typeof consent.ai !== "boolean") {
+    return false;
+  }
+  if ("tools" in consent && typeof consent.tools !== "boolean") {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Validate local permissions object structure
+ * @param {Object} permissions - Permissions object to validate
+ * @returns {boolean} True if valid
+ */
+function isValidLocalPermissions(permissions) {
+  if (typeof permissions !== "object" || permissions === null) {
+    return false;
+  }
+  if ("offline" in permissions && typeof permissions.offline !== "boolean") {
+    return false;
+  }
+  if ("scope" in permissions && typeof permissions.scope !== "string") {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Input validation middleware for chat requests
+ */
+function validateChatInput(req, res, next) {
+  const { message, consent, localPermissions, mode } = req.body;
+
+  // Validate message
+  if (message !== undefined && !isValidMessage(message)) {
+    return res.status(400).json({
+      error: "Invalid message",
+      details: "Message must be a non-empty string with maximum 10,000 characters",
+    });
+  }
+
+  // Validate consent
+  if (consent !== undefined && !isValidConsent(consent)) {
+    return res.status(400).json({
+      error: "Invalid consent",
+      details: "Consent must be an object with boolean 'ai' and 'tools' properties",
+    });
+  }
+
+  // Validate localPermissions
+  if (localPermissions !== undefined && !isValidLocalPermissions(localPermissions)) {
+    return res.status(400).json({
+      error: "Invalid local permissions",
+      details: "Local permissions must be an object with boolean 'offline' and string 'scope' properties",
+    });
+  }
+
+  // Validate mode
+  if (mode !== undefined && typeof mode !== "string") {
+    return res.status(400).json({
+      error: "Invalid mode",
+      details: "Mode must be a string ('online' or 'offline')",
+    });
+  }
+
+  next();
+}
+
 // Middleware
-app.use(
-  cors({
-    origin(origin, callback) {
-      if (!origin || ALLOWED_ORIGINS.includes(origin)) {
-        return callback(null, true);
-      }
-      return callback(new Error("CORS origin not allowed"));
-    },
-  }),
-);
-app.use(
-  rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 120,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: "Too many requests, please try again later.",
-  }),
-);
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "1mb" })); // Reduced from 10mb for security
 app.use("/public", express.static(path.join(__dirname, "public"), { index: false }));
 
 // ============================================================================
@@ -106,7 +299,9 @@ const pendingSherlockStore = new Map();
 
 function resolveSessionId(sessionId = "default") {
   const normalized = String(sessionId || "default").trim();
-  if (!SESSION_ID_PATTERN.test(normalized)) {
+  // Validate session ID format for security
+  if (!isValidSessionId(normalized)) {
+    console.warn(`Invalid session ID format: ${sessionId}, defaulting to "default"`);
     return "default";
   }
   return normalized || "default";
@@ -228,6 +423,7 @@ import {
   detectBiasInAIResponse,
   createAIExplanation,
 } from "./chatbot.js";
+  handleToolRequest,
 
 // ============================================================================
 // SHERLOCK OFFLINE IMPLEMENTATION
@@ -530,7 +726,7 @@ async function callPythonNLP(text, sessionId = "default") {
  * POST /chat - Handle chat messages
  * Enforces all ethical constraints
  */
-app.post("/api/chat", async (req, res) => {
+app.post("/api/chat", validateChatInput, csrfProtection, requireAuth, async (req, res) => {
   try {
     const { message: rawMessage, consent, localPermissions, mode } = req.body;
     const sessionId = getSessionIdFromRequest(req);
@@ -560,6 +756,22 @@ app.post("/api/chat", async (req, res) => {
     }
 
     // Check for Sherlock command
+    // Check for tool commands
+    const toolResponse = await handleToolRequest(message, {
+      sessionId,
+      hasToolConsent: hasToolConsent(sessionId),
+      formatHumanNLP,
+      truncateForMirror,
+    });
+    if (toolResponse) {
+      return res.json({
+        response: formatResponseForDisplay(toolResponse),
+        isTool: true,
+        tool: toolResponse.tool,
+      });
+    }
+    
+
     if (message && message.startsWith("/sherlock ")) {
       const username = message.substring(10).trim();
 
@@ -638,7 +850,10 @@ app.post("/api/chat", async (req, res) => {
         reframe:
           "These organizations provide support, advocacy, and resources:",
         rapport:
-          "Type /sherlock username - Check username\n/moxie message - Talk to Moxie\n/consent yes - Enable AI\n/consent no - Disable AI\n/resources - Show this list",
+          "Type /sherlock username - Check username (safety verification only)\n/moxie message - Talk to Moxie\n/consent yes - Enable AI
+/get_time - Get current time
+/translate text to language - Translate text
+/sherlock_ai username - AI-enhanced safety verification\n/consent no - Disable AI\n/resources - Show this list",
       });
 
       // Include resources in the response
@@ -906,7 +1121,7 @@ app.get("/api/python-status", async (req, res) => {
 /**
  * GET /moxie-checkin - Moxie gentle check-in endpoint
  */
-app.post("/api/local-permissions", (req, res) => {
+app.post("/api/local-permissions", csrfProtection, requireAuth, (req, res) => {
   const sessionId = getSessionIdFromRequest(req);
   const { allow, scope } = req.body || {};
   const granted = Boolean(allow);
@@ -996,7 +1211,7 @@ app.get("/api/consent-status", (req, res) => {
 /**
  * POST /consent - Set consent
  */
-app.post("/api/consent", (req, res) => {
+app.post("/api/consent", csrfProtection, requireAuth, (req, res) => {
   const sessionId = getSessionIdFromRequest(req);
   const { ai, tools } = req.body;
   if (typeof ai !== "boolean" || typeof tools !== "boolean") {

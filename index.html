@@ -915,6 +915,9 @@
               • Chat with me about anything you're going through<br />
               • Use /sherlock username to check if a username appears across
               platforms (for your safety)<br />
+              u2022 Use /get_time to get the current time
+              u2022 Use /translate "text" to "language" to translate text
+              u2022 Use /sherlock_ai username for AI-enhanced safety verification
               • Talk to Moxie, your desktop companion that can work inside this
               chat or outside it<br /><br />
               I'm trauma-informed and prioritize your dignity and autonomy.
@@ -929,7 +932,7 @@
           <input
             type="text"
             id="chat-input"
-            placeholder="Type your message here... (/sherlock username, /moxie hi, /help)"
+            placeholder="Type your message here... (/sherlock username, /get_time, /translate "hello" to "es", /sherlock_ai username, /moxie hi, /help)"
             autocomplete="off"
             aria-label="Chat message"
           />
@@ -1890,11 +1893,15 @@
         setStatus("Thinking...", false, true);
 
         try {
+          const csrfToken = await getCsrfToken();
+          const sessionToken = sessionToken || (await createSession()).token;
           const response = await fetch("/api/chat", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
               "x-session-id": sessionId,
+              "x-csrf-token": csrfToken,
+              "x-session-token": sessionToken,
             },
             body: JSON.stringify({
               message: messageText,

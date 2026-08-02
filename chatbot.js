@@ -147,9 +147,30 @@ const BIAS_PATTERNS = Object.freeze([
   },
 ]);
 
+// Session ID validation constants
+const MAX_SESSION_ID_LENGTH = 64;
+const ALLOWED_SESSION_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
+
+/**
+ * Validate session ID format
+ * @param {string} sessionId - Session ID to validate
+ * @returns {boolean} True if valid
+ */
+function isValidSessionId(sessionId) {
+  if (typeof sessionId !== "string") {
+    return false;
+  }
+  if (sessionId.length === 0 || sessionId.length > MAX_SESSION_ID_LENGTH) {
+    return false;
+  }
+  return ALLOWED_SESSION_ID_PATTERN.test(sessionId);
+}
+
 function normalizeSessionId(sessionId = "default") {
   const normalized = String(sessionId || "default").trim();
-  if (!SESSION_ID_PATTERN.test(normalized)) {
+  // Validate session ID format for security
+  if (!isValidSessionId(normalized)) {
+    console.warn(`Invalid session ID format: ${sessionId}, defaulting to "default"`);
     return "default";
   }
   return normalized || "default";
@@ -1227,6 +1248,33 @@ export class EthicalChatBot {
 }
 
 // ============================================================================
+// ============================================================================
+// SECTION 7: TOOL INTEGRATION
+// ============================================================================
+
+/**
+ * Handle tool commands with ethical constraints
+ * @param {string} userInput - User input
+ * @param {Object} options - Options
+ * @returns {HumanNLPResponse|null} Formatted response or null if not a tool command
+ */
+async function handleToolRequest(userInput, options = {}) {
+  try {
+    // Import tools dynamically to avoid circular dependency
+    const toolsModule = await import("./tools.js");
+    
+    return await toolsModule.handleToolCommand(userInput, {
+      ...options,
+      formatHumanNLP,
+      truncateForMirror,
+    });
+  } catch (error) {
+    console.error("Tool handling error:", error);
+    return null;
+  }
+}
+
+
 // SECTION 7: EXPORTS AND UTILITIES
 // ============================================================================
 
@@ -1235,6 +1283,7 @@ export const chatbot = new EthicalChatBot();
 
 // Export all individual functions for modular use
 export {
+  handleToolRequest,
   CORE_PRINCIPLES,
   BOUNDARY_STATEMENTS,
   CRISIS_RESOURCES,
