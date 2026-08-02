@@ -254,6 +254,7 @@ function validateChatInput(req, res, next) {
 
 // Middleware
 app.use(express.json({ limit: "1mb" })); // Reduced from 10mb for security
+app.use(express.json({ limit: "1mb" })); // Reduced from 10mb for security
 app.use("/public", express.static(path.join(__dirname, "public"), { index: false }));
 
 // ============================================================================
