@@ -196,16 +196,16 @@ async def voice_transcribe(
     Audio bytes are processed in memory and never persisted.
     """
     if not consent:
-    
+        raise HTTPException(
+            status_code=403,
+            detail="Explicit consent is required for voice processing.",
+        )
+
     # Validate file type
     if audio.content_type not in ALLOWED_AUDIO_TYPES:
         raise HTTPException(
             status_code=400,
             detail=f"Unsupported audio type: {audio.content_type}. Only WAV files are accepted.",
-        )
-        raise HTTPException(
-            status_code=403,
-            detail="Explicit consent is required for voice processing.",
         )
     try:
         audio_bytes = await audio.read()
