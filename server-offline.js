@@ -31,8 +31,127 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// ============================================================================
+// SECURITY MIDDLEWARE
+// ============================================================================
+
+// Input validation constants
+const MAX_MESSAGE_LENGTH = 10000; // 10,000 characters max
+const MAX_SESSION_ID_LENGTH = 64;
+const ALLOWED_SESSION_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
+
+/**
+ * Validate chat message input
+ * @param {string} message - User message to validate
+ * @returns {boolean} True if valid
+ */
+function isValidMessage(message) {
+  if (typeof message !== "string") {
+    return false;
+  }
+  if (message.length === 0) {
+    return false;
+  }
+  if (message.length > MAX_MESSAGE_LENGTH) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Validate session ID format
+ * @param {string} sessionId - Session ID to validate
+ * @returns {boolean} True if valid
+ */
+function isValidSessionId(sessionId) {
+  if (typeof sessionId !== "string") {
+    return false;
+  }
+  if (sessionId.length === 0 || sessionId.length > MAX_SESSION_ID_LENGTH) {
+    return false;
+  }
+  return ALLOWED_SESSION_ID_PATTERN.test(sessionId);
+}
+
+/**
+ * Validate consent object structure
+ * @param {Object} consent - Consent object to validate
+ * @returns {boolean} True if valid
+ */
+function isValidConsent(consent) {
+  if (typeof consent !== "object" || consent === null) {
+    return false;
+  }
+  if ("ai" in consent && typeof consent.ai !== "boolean") {
+    return false;
+  }
+  if ("tools" in consent && typeof consent.tools !== "boolean") {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Validate local permissions object structure
+ * @param {Object} permissions - Permissions object to validate
+ * @returns {boolean} True if valid
+ */
+function isValidLocalPermissions(permissions) {
+  if (typeof permissions !== "object" || permissions === null) {
+    return false;
+  }
+  if ("offline" in permissions && typeof permissions.offline !== "boolean") {
+    return false;
+  }
+  if ("scope" in permissions && typeof permissions.scope !== "string") {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Input validation middleware for chat requests
+ */
+function validateChatInput(req, res, next) {
+  const { message, consent, localPermissions, mode } = req.body;
+
+  // Validate message
+  if (message !== undefined && !isValidMessage(message)) {
+    return res.status(400).json({
+      error: "Invalid message",
+      details: "Message must be a non-empty string with maximum 10,000 characters",
+    });
+  }
+
+  // Validate consent
+  if (consent !== undefined && !isValidConsent(consent)) {
+    return res.status(400).json({
+      error: "Invalid consent",
+      details: "Consent must be an object with boolean 'ai' and 'tools' properties",
+    });
+  }
+
+  // Validate localPermissions
+  if (localPermissions !== undefined && !isValidLocalPermissions(localPermissions)) {
+    return res.status(400).json({
+      error: "Invalid local permissions",
+      details: "Local permissions must be an object with boolean 'offline' and string 'scope' properties",
+    });
+  }
+
+  // Validate mode
+  if (mode !== undefined && typeof mode !== "string") {
+    return res.status(400).json({
+      error: "Invalid mode",
+      details: "Mode must be a string ('online' or 'offline')",
+    });
+  }
+
+  next();
+}
+
 // Middleware
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({ limit: "1mb" })); // Reduced from 10mb for security
 app.use("/public", express.static(path.join(__dirname, "public"), { index: false }));
 
 // ============================================================================
@@ -79,6 +198,11 @@ const pendingSherlockStore = new Map();
 
 function resolveSessionId(sessionId = "default") {
   const normalized = String(sessionId || "default").trim();
+  // Validate session ID format for security
+  if (!isValidSessionId(normalized)) {
+    console.warn(`Invalid session ID format: ${sessionId}, defaulting to "default"`);
+    return "default";
+  }
   return normalized || "default";
 }
 
@@ -451,7 +575,7 @@ async function callPythonNLP(text, sessionId = "default") {
  * POST /chat - Handle chat messages
  * Enforces all ethical constraints
  */
-app.post("/api/chat", async (req, res) => {
+app.post("/api/chat", validateChatInput, async (req, res) => {
   try {
     const { message, consent, localPermissions, mode } = req.body;
     const sessionId = getSessionIdFromRequest(req);

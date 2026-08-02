@@ -117,8 +117,32 @@ const DEFAULT_CONSENT = Object.freeze({
 
 const consentStore = new Map();
 
+// Session ID validation constants
+const MAX_SESSION_ID_LENGTH = 64;
+const ALLOWED_SESSION_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
+
+/**
+ * Validate session ID format
+ * @param {string} sessionId - Session ID to validate
+ * @returns {boolean} True if valid
+ */
+function isValidSessionId(sessionId) {
+  if (typeof sessionId !== "string") {
+    return false;
+  }
+  if (sessionId.length === 0 || sessionId.length > MAX_SESSION_ID_LENGTH) {
+    return false;
+  }
+  return ALLOWED_SESSION_ID_PATTERN.test(sessionId);
+}
+
 function normalizeSessionId(sessionId = "default") {
   const normalized = String(sessionId || "default").trim();
+  // Validate session ID format for security
+  if (!isValidSessionId(normalized)) {
+    console.warn(`Invalid session ID format: ${sessionId}, defaulting to "default"`);
+    return "default";
+  }
   return normalized || "default";
 }
 
