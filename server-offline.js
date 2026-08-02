@@ -59,6 +59,28 @@ import {
 } from "./services/crypto/messageEncryption.js";
 import { acceptNonce, clearSessionNonces } from "./services/crypto/replayGuard.js";
 import { ENCRYPTION_DISCLOSURE } from "./services/crypto/cryptoConfig.js";
+import {
+  clearAuditTimeline,
+  getAuditSummary,
+  getAuditTimeline,
+  recordAuditEvent,
+} from "./services/human-rights/auditService.js";
+import {
+  clearConsentHistory,
+  getConsentDashboard,
+  revokeConsentScopes,
+  setConsentState,
+  updateConsentFromLegacy,
+} from "./services/human-rights/versionedConsentService.js";
+import {
+  buildDataManagerSnapshot,
+  buildExportPackage,
+} from "./services/human-rights/dataManagerService.js";
+import {
+  buildResponseTransparency,
+  clearLatestTransparencyRecord,
+  getLatestTransparencyRecord,
+} from "./services/human-rights/transparencyService.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -72,13 +94,46 @@ const ALLOWED_ORIGINS = (process.env.CORS_ALLOWED_ORIGINS ||
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);
+const CONTENT_SECURITY_POLICY = Object.freeze({
+  directives: {
+    defaultSrc: ["'self'"],
+    baseUri: ["'self'"],
+    connectSrc: ["'self'"],
+    fontSrc: ["'self'", "data:"],
+    frameAncestors: ["'none'"],
+    imgSrc: ["'self'", "data:"],
+    objectSrc: ["'none'"],
+    scriptSrc: ["'self'", "'unsafe-inline'"],
+    styleSrc: ["'self'", "'unsafe-inline'"],
+  },
+});
+const HUMAN_RIGHTS_PAGES = Object.freeze([
+  "privacy-dashboard",
+  "consent-dashboard",
+  "data-manager",
+  "export-center",
+  "delete-my-data",
+  "transparency-center",
+  "accessibility-center",
+  "ai-disclosure",
+  "human-rights-report",
+  "security-status",
+  "explain-this-response",
+]);
+const ACCESSIBILITY_GUARANTEES = Object.freeze([
+  "Keyboard-accessible navigation and skip links on every dashboard page.",
+  "Focus-visible controls and semantic headings.",
+  "Reduced-motion support via prefers-reduced-motion.",
+  "Status live regions for export and delete actions.",
+  "Offline-first controls remain available without AI consent.",
+]);
 
 // ============================================================================
 // SECURITY MIDDLEWARE CONFIGURATION
 // ============================================================================
 
 // Helmet for security headers
-app.use(helmet({ contentSecurityPolicy: false }));
+app.use(helmet({ contentSecurityPolicy: CONTENT_SECURITY_POLICY }));
 
 // CORS configuration - restrict to localhost origins for development
 const corsOptions = {
@@ -126,6 +181,9 @@ function createSession() {
   const token = generateSessionToken();
   const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   sessionTokens.set(token, { sessionId, createdAt: Date.now(), lastUsed: Date.now() });
+  recordAuditEvent(sessionId, "session.created", "Created a new anonymous local session.", {
+    offlineMode: OFFLINE_MODE,
+  });
   return { token, sessionId };
 }
 
@@ -361,9 +419,21 @@ function setLocalPermissions(sessionId = "default", permissions = {}) {
   };
   if (!localPermissionState.offline) {
     localPermissionStore.delete(normalizedSessionId);
+    recordAuditEvent(
+      normalizedSessionId,
+      "permission.local.revoked",
+      "Offline local permission was revoked.",
+      { scope: localPermissionState.scope },
+    );
     return { ...DEFAULT_LOCAL_PERMISSIONS };
   }
   localPermissionStore.set(normalizedSessionId, localPermissionState);
+  recordAuditEvent(
+    normalizedSessionId,
+    "permission.local.granted",
+    "Offline local permission was granted.",
+    localPermissionState,
+  );
   return localPermissionState;
 }
 
@@ -392,6 +462,48 @@ function shouldUseOnlineApi(requestedMode) {
     ONLINE_API_ENABLED &&
     Boolean(MISTRAL_API_KEY)
   );
+}
+
+function buildHumanRightsReport(sessionId = "default") {
+  const consentDashboard = getConsentDashboard(sessionId);
+  const auditTimeline = getAuditTimeline(sessionId);
+  const auditSummary = getAuditSummary(sessionId);
+  const latestTransparency = getLatestTransparencyRecord(sessionId);
+  const localPermissions = getLocalPermissions(sessionId);
+  const dataManager = buildDataManagerSnapshot(sessionId, {
+    consentDashboard,
+    auditSummary,
+    localPermissions,
+    latestTransparency,
+  });
+
+  return {
+    generatedAt: new Date().toISOString(),
+    sessionId,
+    consentDashboard,
+    dataManager,
+    auditTimeline,
+    latestTransparency,
+    accessibility: ACCESSIBILITY_GUARANTEES,
+    security: {
+      offlineFirst: true,
+      blockchainOptional: BLOCKCHAIN_ENABLED === false,
+      contentSecurityPolicy:
+        "default-src 'self'; connect-src 'self'; frame-ancestors 'none'; object-src 'none'",
+      rateLimit: "100 requests per 15 minutes on /api routes.",
+      auditLogging: "Structured in-memory audit events with export and delete controls.",
+    },
+  };
+}
+
+function clearSessionHumanRightsData(sessionId = "default") {
+  clearConsentHistory(sessionId);
+  clearLatestTransparencyRecord(sessionId);
+  setUserConsent(false, false, sessionId);
+  setLocalPermissions(sessionId, { offline: false, scope: "offline" });
+  pendingSherlockStore.delete(sessionId);
+  clearSessionNonces(sessionId);
+  clearAuditTimeline(sessionId);
 }
 
 /**
@@ -659,6 +771,73 @@ function buildExplainedAIResult(message, aiText, provider, mode = "offline") {
   };
 }
 
+function buildTransparentChatPayload({
+  sessionId,
+  message,
+  response,
+  provider = "local-curated",
+  model = null,
+  mode = "offline",
+  aiUsed = false,
+  explanation = null,
+  biasAssessment = { flagged: false, issues: [] },
+  extra = {},
+} = {}) {
+  const transparency = buildResponseTransparency({
+    sessionId,
+    message,
+    provider,
+    model,
+    mode,
+    aiUsed,
+    sentData:
+      mode === "online" && aiUsed
+        ? ["User message text sent to the configured online AI provider."]
+        : ["No external transfer recorded."],
+    why: aiUsed
+      ? "Respond using the consented AI path while preserving transparency and safety checks."
+      : "Respond with local-first logic because AI was refused, unavailable, or unnecessary.",
+    confidence: aiUsed ? "medium" : "high",
+    limitations: aiUsed
+      ? ["AI support can be imperfect, incomplete, or shaped by training data."]
+      : ["Local rule-based support may be less tailored than an opted-in AI response."],
+    safetyChecks: [
+      "Anchor",
+      "Mirror",
+      "Reframe",
+      "Rapport",
+      "Safety Check",
+      "Bias Check",
+      "Transparency Check",
+      "Human Rights Check",
+    ],
+    biasAssessment,
+    explanation,
+  });
+
+  recordAuditEvent(
+    sessionId,
+    "response.generated",
+    aiUsed ? "Generated an AI-disclosed response." : "Generated a local-first response.",
+    {
+      aiUsed,
+      provider,
+      mode,
+    },
+  );
+
+  return {
+    response: formatResponseForDisplay(response),
+    offline: mode !== "online",
+    online: mode === "online",
+    provider,
+    model,
+    aiAssisted: aiUsed,
+    transparency,
+    ...extra,
+  };
+}
+
 // ============================================================================
 // PYTHON MICROSERVICE INTEGRATION (Optional — degrades gracefully)
 // ============================================================================
@@ -780,6 +959,13 @@ app.post("/api/chat", validateChatInput, csrfProtection, requireAuth, async (req
     // Update consent if provided
     if (consent && typeof consent === "object") {
       setUserConsent(consent.ai, consent.tools, sessionId);
+      updateConsentFromLegacy(sessionId, {
+        ai: consent.ai,
+        tools: consent.tools,
+        reason: consent.reason || "User updated chat consent preferences.",
+        aiProvider: requestedMode === "online" ? "mistral" : "local",
+        expiry: consent.expiry || null,
+      });
     }
 
     if (localPermissions && typeof localPermissions === "object") {
@@ -795,11 +981,16 @@ app.post("/api/chat", validateChatInput, csrfProtection, requireAuth, async (req
       truncateForMirror,
     });
     if (toolResponse) {
-      return res.json({
-        response: formatResponseForDisplay(toolResponse),
+      return res.json(buildTransparentChatPayload({
+        sessionId,
+        message,
+        response: toolResponse,
+        provider: "local-tooling",
+        extra: {
         isTool: true,
         tool: toolResponse.tool,
-      });
+        },
+      }));
     }
     
 
@@ -963,6 +1154,12 @@ app.post("/api/chat", validateChatInput, csrfProtection, requireAuth, async (req
       } else {
         setUserConsent(true, true, sessionId);
       }
+      updateConsentFromLegacy(sessionId, {
+        ai: true,
+        tools: true,
+        reason: "User granted consent through the chat command flow.",
+        aiProvider: requestedMode === "online" ? "mistral" : "local",
+      });
       const response = formatHumanNLP({
         userInput: message,
         anchor: "Thank you for your consent.",
@@ -987,6 +1184,11 @@ app.post("/api/chat", validateChatInput, csrfProtection, requireAuth, async (req
         message.toLowerCase() === "/consent no")
     ) {
       setUserConsent(false, false, sessionId);
+      revokeConsentScopes(
+        sessionId,
+        ["ai", "sherlock", "resources", "internet", "voice", "microphone", "analytics", "blockchain", "futureIntegrations"],
+        "User revoked consent through the chat command flow.",
+      );
       pendingSherlockStore.delete(sessionId);
       const response = formatHumanNLP({
         userInput: message,
@@ -1029,7 +1231,12 @@ app.post("/api/chat", validateChatInput, csrfProtection, requireAuth, async (req
         isCrisis: true,
       });
       return res.json({
-        response: formatResponseForDisplay(crisisResponse),
+        ...buildTransparentChatPayload({
+          sessionId,
+          message,
+          response: crisisResponse,
+          provider: "local-safety",
+        }),
         safetyFlag: pythonSafety,
         isCrisis: true,
       });
@@ -1050,10 +1257,17 @@ app.post("/api/chat", validateChatInput, csrfProtection, requireAuth, async (req
           "offline",
         );
         return res.json({
-          response: formatResponseForDisplay(localLLMResult.response),
-          offline: true,
-          provider: "ollama",
-          aiAssisted: true,
+          ...buildTransparentChatPayload({
+            sessionId,
+            message,
+            response: localLLMResult.response,
+            provider: "ollama",
+            model: "ollama-local",
+            mode: "offline",
+            aiUsed: true,
+            explanation: localLLMResult.explanation,
+            biasAssessment: localLLMResult.biasAssessment,
+          }),
           explanation: localLLMResult.explanation,
           biasAssessment: localLLMResult.biasAssessment,
           aiSafeguarded: localLLMResult.aiSafeguarded,
@@ -1072,12 +1286,17 @@ app.post("/api/chat", validateChatInput, csrfProtection, requireAuth, async (req
             "online",
           );
           return res.json({
-            response: formatResponseForDisplay(onlineResult.response),
-            offline: false,
-            online: true,
-            provider: "mistral",
-            model: MISTRAL_MODEL,
-            aiAssisted: true,
+            ...buildTransparentChatPayload({
+              sessionId,
+              message,
+              response: onlineResult.response,
+              provider: "mistral",
+              model: MISTRAL_MODEL,
+              mode: "online",
+              aiUsed: true,
+              explanation: onlineResult.explanation,
+              biasAssessment: onlineResult.biasAssessment,
+            }),
             explanation: onlineResult.explanation,
             biasAssessment: onlineResult.biasAssessment,
             aiSafeguarded: onlineResult.aiSafeguarded,
@@ -1093,12 +1312,15 @@ app.post("/api/chat", validateChatInput, csrfProtection, requireAuth, async (req
     }
 
     // Default: ethical local response
-    const displayResponse = formatResponseForDisplay(response);
     return res.json({
-      response: displayResponse,
-      offline: !onlineApiActive,
-      online: onlineApiActive,
-      model: localModel?.name || null,
+      ...buildTransparentChatPayload({
+        sessionId,
+        message,
+        response,
+        provider: "local-curated",
+        model: localModel?.name || null,
+        mode: "offline",
+      }),
       nlp: pythonNlp,
     });
   } catch (error) {
@@ -1572,6 +1794,7 @@ app.get("/api/consent-status", (req, res) => {
     modelLoaded: modelLoaded,
     model: localModel,
     localPermissions: getLocalPermissions(sessionId),
+    versionedConsent: getConsentDashboard(sessionId),
   });
 });
 
@@ -1580,17 +1803,38 @@ app.get("/api/consent-status", (req, res) => {
  */
 app.post("/api/consent", csrfProtection, requireAuth, (req, res) => {
   const sessionId = getSessionIdFromRequest(req);
-  const { ai, tools } = req.body;
+  const { ai, tools, scopes, reason, aiProvider, expiry } = req.body;
   if (typeof ai !== "boolean" || typeof tools !== "boolean") {
     return res.status(400).json({
       error: "Consent values must be booleans for both ai and tools.",
     });
   }
   setUserConsent(ai, tools, sessionId);
+  const versionedConsent = scopes && typeof scopes === "object"
+    ? setConsentState(sessionId, {
+        scopes,
+        reason: reason || "User updated granular consent preferences.",
+        aiProvider: aiProvider || (ai ? "local" : "none"),
+        expiry: expiry || null,
+        status: Object.values(scopes).some(Boolean) ? "granted" : "revoked",
+      })
+    : updateConsentFromLegacy(sessionId, {
+        ai,
+        tools,
+        reason: reason || "User updated AI/tool consent preferences.",
+        aiProvider: aiProvider || (ai ? "local" : "none"),
+        expiry: expiry || null,
+      });
+  recordAuditEvent(sessionId, "consent.updated", "Consent settings were updated.", {
+    ai,
+    tools,
+    activeScopes: versionedConsent.activeScopes,
+  });
 
   res.json({
     success: true,
     consent: getConsentState(sessionId),
+    versionedConsent: getConsentDashboard(sessionId),
   });
 });
 
@@ -1626,6 +1870,12 @@ app.get("/api/health", (req, res) => {
  */
 app.get("/api/session", csrfProtection, (req, res) => {
   const { token, sessionId: newSessionId } = createSession();
+  updateConsentFromLegacy(newSessionId, {
+    ai: false,
+    tools: false,
+    reason: "Initialized versioned consent dashboard with all scopes off by default.",
+    aiProvider: "none",
+  });
   return res.json({
     token,
     sessionId: newSessionId,
@@ -1652,6 +1902,41 @@ app.get("/", (req, res) => {
  */
 app.get("/consent-ledger", limiter, (req, res) => {
   res.sendFile(path.join(__dirname, "public", "consent-ledger.html"));
+});
+
+for (const page of HUMAN_RIGHTS_PAGES) {
+  app.get(`/${page}`, limiter, (req, res) => {
+    res.sendFile(path.join(__dirname, "public", `${page}.html`));
+  });
+}
+
+app.get("/api/human-rights/report", requireAuth, (req, res) => {
+  const sessionId = getSessionIdFromRequest(req);
+  res.json(buildHumanRightsReport(sessionId));
+});
+
+app.post("/api/data-export", csrfProtection, requireAuth, async (req, res) => {
+  const sessionId = getSessionIdFromRequest(req);
+  recordAuditEvent(sessionId, "data.exported", "User exported current-session transparency data.", {
+    page: req.body?.page || null,
+  });
+  const exportPackage = buildExportPackage(sessionId, buildHumanRightsReport(sessionId));
+  try {
+    await recordExport({ context: "human_rights_export", page: req.body?.page || "dashboard" });
+  } catch {
+    // Export remains available even when the optional ledger is unavailable.
+  }
+  res.json({ success: true, exportPackage });
+});
+
+app.post("/api/data-delete", csrfProtection, requireAuth, (req, res) => {
+  const sessionId = getSessionIdFromRequest(req);
+  clearSessionHumanRightsData(sessionId);
+  res.json({
+    success: true,
+    message:
+      "Current-session consent history, audit records, explainability records, and local permissions were deleted.",
+  });
 });
 
 // ============================================================================
