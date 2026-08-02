@@ -116,6 +116,36 @@ const DEFAULT_CONSENT = Object.freeze({
 });
 
 const consentStore = new Map();
+const SESSION_ID_PATTERN = /^[a-zA-Z0-9_-]{1,64}$/;
+const BIAS_PATTERNS = Object.freeze([
+  {
+    category: "stereotype",
+    pattern: /\b(all|most|typical)\s+(sex workers|women|men|people like you)\b/i,
+    description: "generalizes about a group or identity",
+  },
+  {
+    category: "stigmatizing",
+    pattern: /\b(normal people|you people|people like you|real women|real men)\b/i,
+    description: "uses stigmatizing or exclusionary group language",
+  },
+  {
+    category: "moralizing",
+    pattern: /\b(dirty|immoral|promiscuous|asking for it|criminal by nature)\b/i,
+    description: "uses shaming or moralizing language",
+  },
+  {
+    category: "coercive",
+    pattern:
+      /\b(just leave|simply leave|there is only one right choice|you must obey|you have to obey)\b/i,
+    description: "pushes a single coercive course of action",
+  },
+  {
+    category: "diagnostic",
+    pattern:
+      /\byou (are|sound|seem)\s+(crazy|psychotic|schizophrenic|borderline|bipolar|manic)\b/i,
+    description: "assigns a mental health label or diagnosis",
+  },
+]);
 
 // Session ID validation constants
 const MAX_SESSION_ID_LENGTH = 64;
@@ -146,6 +176,13 @@ function normalizeSessionId(sessionId = "default") {
   return normalized || "default";
 }
 
+function minimizeConsentState(consentState = DEFAULT_CONSENT) {
+  return Object.freeze({
+    ai: Boolean(consentState?.ai),
+    tools: Boolean(consentState?.tools),
+  });
+}
+
 /**
  * Set user consent for AI and/or tools
  * @param {boolean} aiConsent - Consent for AI usage
@@ -153,11 +190,15 @@ function normalizeSessionId(sessionId = "default") {
  */
 function setUserConsent(aiConsent = false, toolsConsent = false, sessionId = "default") {
   const normalizedSessionId = normalizeSessionId(sessionId);
-  const consentState = Object.freeze({
-    ai: Boolean(aiConsent),
-    tools: Boolean(toolsConsent),
+  const consentState = minimizeConsentState({
+    ai: aiConsent,
+    tools: toolsConsent,
   });
-  consentStore.set(normalizedSessionId, consentState);
+  if (!consentState.ai && !consentState.tools) {
+    consentStore.delete(normalizedSessionId);
+  } else {
+    consentStore.set(normalizedSessionId, consentState);
+  }
   // Do not log consent values — they are sensitive user state
   console.log("[CONSENT] Consent state updated for session.");
 
@@ -192,8 +233,71 @@ function hasToolConsent(sessionId = "default") {
  */
 function getConsentState(sessionId = "default") {
   const normalizedSessionId = normalizeSessionId(sessionId);
+  return minimizeConsentState(
+    consentStore.get(normalizedSessionId) || DEFAULT_CONSENT,
+  );
+}
+
+function detectBiasInAIResponse(responseText = "") {
+  const text = String(responseText || "").trim();
+  if (!text) {
+    return Object.freeze({
+      flagged: false,
+      issues: [],
+    });
+  }
+
+  const issues = BIAS_PATTERNS.flatMap(({ category, pattern, description }) => {
+    const match = text.match(pattern);
+    if (!match) {
+      return [];
+    }
+
+    return {
+      category,
+      description,
+      matchedText: match[0],
+    };
+  });
+
   return Object.freeze({
-    ...(consentStore.get(normalizedSessionId) || DEFAULT_CONSENT),
+    flagged: issues.length > 0,
+    issues: Object.freeze(issues),
+  });
+}
+
+function createAIExplanation({
+  provider = "local",
+  mode = "offline",
+  biasAssessment = { flagged: false, issues: [] },
+  usedFallback = false,
+} = {}) {
+  const safetyChecks = [
+    "Explicit consent was checked before AI was used.",
+    "The message was screened for crisis and sensitive-topic risks.",
+    "The AI output was screened for high-confidence bias markers.",
+  ];
+
+  return Object.freeze({
+    title: "Why this response looks this way",
+    summary:
+      provider === "mistral"
+        ? "You enabled AI assistance, so this reply used the configured Mistral service."
+        : "You enabled AI assistance, so this reply used the local Ollama service when available.",
+    provider,
+    mode,
+    dataUse:
+      provider === "mistral"
+        ? "Your message text was sent to the configured Mistral API for this reply."
+        : "Your message stayed on this device while the local model generated this reply.",
+    safetyChecks: Object.freeze(safetyChecks),
+    biasMitigation: usedFallback
+      ? `A safer fallback replaced the raw AI text because the bias screen flagged: ${biasAssessment.issues.map((issue) => issue.description).join(", ")}.`
+      : biasAssessment.flagged
+        ? `Bias markers were detected and softened before display: ${biasAssessment.issues.map((issue) => issue.description).join(", ")}.`
+        : "No high-confidence bias markers were detected, but AI output can still be imperfect or incomplete.",
+    limitations:
+      "AI support is assistive only. It can be wrong, incomplete, or shaped by training data.",
   });
 }
 
@@ -1191,8 +1295,11 @@ export {
   hasAIConsent,
   hasToolConsent,
   getConsentState,
+  minimizeConsentState,
   detectSensitiveInput,
   detectCrisis,
+  detectBiasInAIResponse,
+  createAIExplanation,
   getSafeRedirection,
   formatHumanNLP,
   formatResponseForDisplay,
