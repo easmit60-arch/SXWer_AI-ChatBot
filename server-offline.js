@@ -876,8 +876,7 @@ app.get("/moxie.css", (req, res) => {
  * GET /riot-grrrl.css - Serve Riot Grrrl palette
  */
 app.get("/riot-grrrl.css", (req, res) => {
-  const css = fs.readFileSync(path.join(__dirname, "riot-grrrl.css"), "utf8");
-  res.type("text/css").send(css);
+  res.sendFile(path.join(__dirname, "riot-grrrl.css"));
 });
 
 /**

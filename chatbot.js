@@ -756,9 +756,8 @@ function checkSherlockProtocol(userRequest, options = {}) {
     }
   }
 
-  const sherlockCommandMatch = userRequest.match(/^\/sherlock\s+(.+)$/i);
-  if (sherlockCommandMatch) {
-    const usernameCheck = validateSherlockUsername(sherlockCommandMatch[1]);
+  if (lowerRequest.startsWith("/sherlock ")) {
+    const usernameCheck = validateSherlockUsername(userRequest.slice(10).trim());
     if (usernameCheck.valid) {
       hasAllowedPurpose = true;
     }
