@@ -29,6 +29,20 @@ import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
 import resources from "./resources.json" with { type: "json" };
+import {
+  recordConsent,
+  revokeConsent,
+  verifyConsent,
+  recordDeletion,
+  recordExport,
+  recordPolicyAcceptance,
+  getConsentHistory,
+  exportLedger,
+  clearLocalLedger,
+  getConsentStatus,
+} from "./services/blockchain/consentLedger.js";
+import { disconnectWallet, getWalletInfo, isWalletConnected } from "./services/blockchain/walletService.js";
+import { BLOCKCHAIN_ENABLED, INFORMED_CONSENT_DISCLOSURE } from "./services/blockchain/ledgerConfig.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -80,7 +94,7 @@ app.use("/api/", limiter);
 
 // Cookie parser for CSRF token handling
 app.use(cookieParser());
-n// Session token management
+// Session token management
 const sessionTokens = new Map();
 
 function generateSessionToken() {
@@ -423,8 +437,8 @@ import {
   truncateForMirror,
   detectBiasInAIResponse,
   createAIExplanation,
-} from "./chatbot.js";
   handleToolRequest,
+} from "./chatbot.js";
 
 // ============================================================================
 // SHERLOCK OFFLINE IMPLEMENTATION
@@ -851,10 +865,7 @@ app.post("/api/chat", validateChatInput, csrfProtection, requireAuth, async (req
         reframe:
           "These organizations provide support, advocacy, and resources:",
         rapport:
-          "Type /sherlock username - Check username (safety verification only)\n/moxie message - Talk to Moxie\n/consent yes - Enable AI
-/get_time - Get current time
-/translate text to language - Translate text
-/sherlock_ai username - AI-enhanced safety verification\n/consent no - Disable AI\n/resources - Show this list",
+          "Type /sherlock username - Check username (safety verification only)\n/moxie message - Talk to Moxie\n/consent yes - Enable AI\n/get_time - Get current time\n/translate text to language - Translate text\n/sherlock_ai username - AI-enhanced safety verification\n/consent no - Disable AI\n/resources - Show this list",
       });
 
       // Include resources in the response
@@ -1250,6 +1261,202 @@ app.get("/api/health", (req, res) => {
  */
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
+});
+
+/**
+ * GET /consent-ledger - Serve Consent Ledger UI page
+ */
+app.get("/consent-ledger", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "consent-ledger.html"));
+});
+
+// ============================================================================
+// CONSENT LEDGER API ROUTES
+//
+// All routes are read-only except POST routes which require an authenticated
+// session.  The ledger API is intentionally available whether or not blockchain
+// is enabled — it always reflects local in-memory state.
+// ============================================================================
+
+/**
+ * GET /api/ledger/status
+ * Return the current consent status summary.
+ */
+app.get("/api/ledger/status", (req, res) => {
+  try {
+    const status = getConsentStatus();
+    const wallet = getWalletInfo();
+    res.json({
+      ...status,
+      walletConnected: isWalletConnected(),
+      walletId: wallet ? wallet.walletId : null,
+      providerName: BLOCKCHAIN_ENABLED ? "configured" : "none",
+      verificationStatus: "not-run",
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Could not read ledger status.", details: err.message });
+  }
+});
+
+/**
+ * GET /api/ledger/history
+ * Return all consent receipts from the local in-memory ledger.
+ */
+app.get("/api/ledger/history", (req, res) => {
+  try {
+    const receipts = getConsentHistory();
+    res.json({ receipts, total: receipts.length });
+  } catch (err) {
+    res.status(500).json({ error: "Could not read ledger history.", details: err.message });
+  }
+});
+
+/**
+ * GET /api/ledger/disclosure
+ * Return the full informed-consent disclosure text for the blockchain feature.
+ */
+app.get("/api/ledger/disclosure", (req, res) => {
+  res.json(INFORMED_CONSENT_DISCLOSURE);
+});
+
+/**
+ * GET /api/ledger/export
+ * Return a portable export package of all local consent records.
+ */
+app.get("/api/ledger/export", (req, res) => {
+  try {
+    const pkg = exportLedger();
+    res.json(pkg);
+  } catch (err) {
+    res.status(500).json({ error: "Export failed.", details: err.message });
+  }
+});
+
+/**
+ * GET /api/ledger/verify
+ * Verify the integrity of all local consent receipts.
+ */
+app.get("/api/ledger/verify", (req, res) => {
+  try {
+    const receipts = getConsentHistory();
+    let verified = 0;
+    let invalid = 0;
+
+    for (const receipt of receipts) {
+      const result = verifyConsent(receipt);
+      if (result.valid) { verified++; } else { invalid++; }
+    }
+
+    res.json({
+      verified,
+      invalid,
+      total: receipts.length,
+      allValid: invalid === 0,
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Verification failed.", details: err.message });
+  }
+});
+
+/**
+ * POST /api/ledger/consent
+ * Record a consent-granted event.
+ */
+app.post("/api/ledger/consent", csrfProtection, requireAuth, async (req, res) => {
+  try {
+    const { policyVersion, consentText } = req.body || {};
+    const receipt = await recordConsent({ policyVersion, consentText });
+    res.json({ success: true, receipt });
+  } catch (err) {
+    res.status(500).json({ error: "Could not record consent.", details: err.message });
+  }
+});
+
+/**
+ * POST /api/ledger/revoke
+ * Record a consent-revoked event.
+ */
+app.post("/api/ledger/revoke", csrfProtection, requireAuth, async (req, res) => {
+  try {
+    const receipt = await revokeConsent(req.body || {});
+    res.json({ success: true, receipt });
+  } catch (err) {
+    res.status(500).json({ error: "Could not revoke consent.", details: err.message });
+  }
+});
+
+/**
+ * POST /api/ledger/record-export
+ * Record that a data export was performed.
+ */
+app.post("/api/ledger/record-export", csrfProtection, requireAuth, async (req, res) => {
+  try {
+    const receipt = await recordExport(req.body || {});
+    res.json({ success: true, receipt });
+  } catch (err) {
+    res.status(500).json({ error: "Could not record export.", details: err.message });
+  }
+});
+
+/**
+ * POST /api/ledger/record-deletion
+ * Record that local data was deleted.
+ */
+app.post("/api/ledger/record-deletion", csrfProtection, requireAuth, async (req, res) => {
+  try {
+    const receipt = await recordDeletion(req.body || {});
+    res.json({ success: true, receipt });
+  } catch (err) {
+    res.status(500).json({ error: "Could not record deletion.", details: err.message });
+  }
+});
+
+/**
+ * POST /api/ledger/policy-acceptance
+ * Record that the user accepted a specific policy version.
+ */
+app.post("/api/ledger/policy-acceptance", csrfProtection, requireAuth, async (req, res) => {
+  try {
+    const { policyVersion, policyDocumentText } = req.body || {};
+    if (!policyVersion) {
+      return res.status(400).json({ error: "policyVersion is required." });
+    }
+    const receipt = await recordPolicyAcceptance(policyVersion, policyDocumentText);
+    res.json({ success: true, receipt });
+  } catch (err) {
+    res.status(500).json({ error: "Could not record policy acceptance.", details: err.message });
+  }
+});
+
+/**
+ * POST /api/ledger/wallet/disconnect
+ * Disconnect the current wallet and clear key material from memory.
+ */
+app.post("/api/ledger/wallet/disconnect", csrfProtection, requireAuth, (req, res) => {
+  const disconnected = disconnectWallet();
+  res.json({ success: true, disconnected });
+});
+
+/**
+ * POST /api/ledger/blockchain/disable
+ * Disable blockchain support for this session.
+ * On-chain records (if any) are immutable and unaffected.
+ * Local ledger is cleared.
+ */
+app.post("/api/ledger/blockchain/disable", csrfProtection, requireAuth, async (req, res) => {
+  try {
+    // Record a BLOCKCHAIN_DISABLED event before clearing
+    await revokeConsent({ context: "blockchain_disabled" });
+    disconnectWallet();
+    const cleared = clearLocalLedger();
+    res.json({
+      success: true,
+      message: "Blockchain disabled. Local ledger cleared. Wallet disconnected.",
+      recordsCleared: cleared,
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Could not disable blockchain.", details: err.message });
+  }
 });
 
 /**
