@@ -20,7 +20,7 @@ from typing import Optional
 
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -33,6 +33,8 @@ from voice_pipeline import get_voice_status, synthesize_speech, transcribe_audio
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+MAX_TEXT_LENGTH = int(os.getenv("MAX_TEXT_LENGTH", "10000"))
+MAX_SYSTEM_PROMPT_LENGTH = int(os.getenv("MAX_SYSTEM_PROMPT_LENGTH", "2000"))
 
 # Security constants for voice processing
 MAX_AUDIO_SIZE = 10 * 1024 * 1024  # 10MB max audio file size
@@ -60,19 +62,19 @@ app = FastAPI(
 # ---------------------------------------------------------------------------
 
 class TextRequest(BaseModel):
-    text: str
+    text: str = Field(min_length=1, max_length=MAX_TEXT_LENGTH)
     consent: bool = False
 
 
 class ChatRequest(BaseModel):
-    message: str
-    system_prompt: Optional[str] = None
-    max_tokens: int = 320
+    message: str = Field(min_length=1, max_length=MAX_TEXT_LENGTH)
+    system_prompt: Optional[str] = Field(default=None, max_length=MAX_SYSTEM_PROMPT_LENGTH)
+    max_tokens: int = Field(default=320, ge=1, le=1024)
     consent: bool = False
 
 
 class TTSRequest(BaseModel):
-    text: str
+    text: str = Field(min_length=1, max_length=MAX_TEXT_LENGTH)
     voice: Optional[str] = None
     consent: bool = False
 

@@ -47,6 +47,7 @@ You can use the app in a few simple ways:
 - Use /help to see the available commands.
 - Use /consent yes to allow AI assistance.
 - Use /consent no to keep the experience local-only.
+- AI consent and offline local-permission choices are kept only for the current browser session.
 - Use /sherlock username for your own safety verification only, after consent.
 - Use /moxie message to talk with Moxie, your desktop companion.
 - Use /resources to view support resources.
@@ -103,6 +104,8 @@ See [python/README.md](python/README.md) for full setup instructions, including 
 
 - The default experience is local-first and does not require external services.
 - The Python microservice processes everything on-device and stores nothing.
+- AI-assisted replies include a short explanation of the provider, data use, and safety checks.
+- AI replies are screened for high-confidence bias markers before they are shown.
 - Do not commit real API keys or secrets.
 - Keep sensitive values in a local .env file.
 - The app is not a substitute for professional medical, legal, or crisis services.

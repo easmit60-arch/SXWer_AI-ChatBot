@@ -35,6 +35,13 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const MAX_MESSAGE_LENGTH = Number(process.env.MAX_MESSAGE_LENGTH || 4000);
+const SESSION_ID_PATTERN = /^[a-zA-Z0-9_-]{1,64}$/;
+const ALLOWED_ORIGINS = (process.env.CORS_ALLOWED_ORIGINS ||
+  "http://localhost:3000,http://127.0.0.1:3000")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 // ============================================================================
 // SECURITY MIDDLEWARE CONFIGURATION
@@ -132,7 +139,6 @@ const csrfProtection = csrf({ cookie: true });
 // ============================================================================
 
 // Input validation constants
-const MAX_MESSAGE_LENGTH = 10000; // 10,000 characters max
 const MAX_SESSION_ID_LENGTH = 64;
 const ALLOWED_SESSION_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
 
@@ -271,7 +277,7 @@ const PYTHON_API_URL = process.env.PYTHON_API_URL || "";
 console.log(`\nSXWer AI ChatBot - ${OFFLINE_MODE ? "OFFLINE" : "ONLINE"} Mode`);
 console.log(`Model Path: ${LOCAL_MODEL_PATH}`);
 console.log(
-  `Online API: ${ONLINE_API_ENABLED && MISTRAL_API_KEY ? "configured" : "disabled"}`,
+  `Online API: ${ONLINE_API_ENABLED ? "available when configured" : "disabled"}`,
 );
 console.log(
   `Python service: ${PYTHON_API_URL ? PYTHON_API_URL : "not configured (optional)"}`,
@@ -286,7 +292,6 @@ let localModel = null;
 let modelLoaded = false;
 const DEFAULT_LOCAL_PERMISSIONS = Object.freeze({
   offline: false,
-  grantedAt: null,
   scope: "offline",
 });
 const localPermissionStore = new Map();
@@ -302,6 +307,12 @@ function resolveSessionId(sessionId = "default") {
   return normalized || "default";
 }
 
+function sanitizeUserMessage(input) {
+  return String(input ?? "")
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
+    .trim();
+}
+
 function getSessionIdFromRequest(req) {
   return resolveSessionId(
     req.body?.sessionId ||
@@ -315,9 +326,12 @@ function setLocalPermissions(sessionId = "default", permissions = {}) {
   const normalizedSessionId = resolveSessionId(sessionId);
   const localPermissionState = {
     offline: Boolean(permissions.offline),
-    grantedAt: permissions.grantedAt || null,
     scope: permissions.scope || "offline",
   };
+  if (!localPermissionState.offline) {
+    localPermissionStore.delete(normalizedSessionId);
+    return { ...DEFAULT_LOCAL_PERMISSIONS };
+  }
   localPermissionStore.set(normalizedSessionId, localPermissionState);
   return localPermissionState;
 }
@@ -406,6 +420,8 @@ import {
   requestSherlockConsent,
   formatHumanNLP,
   truncateForMirror,
+  detectBiasInAIResponse,
+  createAIExplanation,
 } from "./chatbot.js";
   handleToolRequest,
 
@@ -574,6 +590,44 @@ function buildOnlineResponse(message, aiText) {
   });
 }
 
+function buildBiasMitigatedResponse(message, biasAssessment) {
+  const issueSummary = biasAssessment.issues
+    .map((issue) => issue.description)
+    .join(", ");
+
+  return formatHumanNLP({
+    userInput: message,
+    anchor: "I adjusted this reply to keep it safer and less biased.",
+    mirror: `You asked: "${truncateForMirror(message)}"`,
+    reframe:
+      `I did not show the raw AI text because it included language that could feel harmful or stigmatizing (${issueSummary}). ` +
+      "Instead, I’m keeping the response grounded in dignity, autonomy, and non-judgment.",
+    rapport:
+      "Would you like a local-only response, a different framing, or support resources instead?",
+    isAI: true,
+  });
+}
+
+function buildExplainedAIResult(message, aiText, provider, mode = "offline") {
+  const biasAssessment = detectBiasInAIResponse(aiText);
+  const usedFallback = biasAssessment.flagged;
+  const response = usedFallback
+    ? buildBiasMitigatedResponse(message, biasAssessment)
+    : buildOnlineResponse(message, aiText);
+
+  return {
+    response,
+    explanation: createAIExplanation({
+      provider,
+      mode,
+      biasAssessment,
+      usedFallback,
+    }),
+    biasAssessment,
+    aiSafeguarded: usedFallback,
+  };
+}
+
 // ============================================================================
 // PYTHON MICROSERVICE INTEGRATION (Optional — degrades gracefully)
 // ============================================================================
@@ -674,11 +728,23 @@ async function callPythonNLP(text, sessionId = "default") {
  */
 app.post("/api/chat", validateChatInput, csrfProtection, requireAuth, async (req, res) => {
   try {
-    const { message, consent, localPermissions, mode } = req.body;
+    const { message: rawMessage, consent, localPermissions, mode } = req.body;
     const sessionId = getSessionIdFromRequest(req);
+    const message = sanitizeUserMessage(rawMessage);
     const requestedMode = getRequestedMode(mode);
     const onlineModeAllowed = shouldAllowOnlineMode(requestedMode);
     const onlineApiActive = shouldUseOnlineApi(requestedMode);
+
+    if (!message) {
+      return res.status(400).json({
+        error: "Message is required and must be a non-empty string.",
+      });
+    }
+    if (message.length > MAX_MESSAGE_LENGTH) {
+      return res.status(400).json({
+        error: `Message exceeds maximum length of ${MAX_MESSAGE_LENGTH} characters.`,
+      });
+    }
 
     // Update consent if provided
     if (consent && typeof consent === "object") {
@@ -949,12 +1015,20 @@ app.post("/api/chat", validateChatInput, csrfProtection, requireAuth, async (req
       // 1. Python local LLM (Ollama — no external API, highest privacy)
       const localLLMText = await callPythonLocalLLM(message, sessionId);
       if (localLLMText) {
-        const localLLMResponse = buildOnlineResponse(message, localLLMText);
+        const localLLMResult = buildExplainedAIResult(
+          message,
+          localLLMText,
+          "ollama",
+          "offline",
+        );
         return res.json({
-          response: formatResponseForDisplay(localLLMResponse),
+          response: formatResponseForDisplay(localLLMResult.response),
           offline: true,
           provider: "ollama",
           aiAssisted: true,
+          explanation: localLLMResult.explanation,
+          biasAssessment: localLLMResult.biasAssessment,
+          aiSafeguarded: localLLMResult.aiSafeguarded,
           nlp: pythonNlp,
         });
       }
@@ -963,14 +1037,22 @@ app.post("/api/chat", validateChatInput, csrfProtection, requireAuth, async (req
       if (onlineApiActive) {
         try {
           const aiText = await callOnlineModel(message);
-          const onlineResponse = buildOnlineResponse(message, aiText);
+          const onlineResult = buildExplainedAIResult(
+            message,
+            aiText,
+            "mistral",
+            "online",
+          );
           return res.json({
-            response: formatResponseForDisplay(onlineResponse),
+            response: formatResponseForDisplay(onlineResult.response),
             offline: false,
             online: true,
             provider: "mistral",
             model: MISTRAL_MODEL,
             aiAssisted: true,
+            explanation: onlineResult.explanation,
+            biasAssessment: onlineResult.biasAssessment,
+            aiSafeguarded: onlineResult.aiSafeguarded,
             nlp: pythonNlp,
           });
         } catch (error) {
@@ -1046,7 +1128,6 @@ app.post("/api/local-permissions", csrfProtection, requireAuth, (req, res) => {
 
   const localPermissionState = setLocalPermissions(sessionId, {
     offline: granted,
-    grantedAt: granted ? new Date().toISOString() : null,
     scope: scope || "offline",
   });
 
@@ -1133,6 +1214,11 @@ app.get("/api/consent-status", (req, res) => {
 app.post("/api/consent", csrfProtection, requireAuth, (req, res) => {
   const sessionId = getSessionIdFromRequest(req);
   const { ai, tools } = req.body;
+  if (typeof ai !== "boolean" || typeof tools !== "boolean") {
+    return res.status(400).json({
+      error: "Consent values must be booleans for both ai and tools.",
+    });
+  }
   setUserConsent(ai, tools, sessionId);
 
   res.json({
