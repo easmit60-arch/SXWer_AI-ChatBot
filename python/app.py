@@ -34,6 +34,10 @@ from voice_pipeline import get_voice_status, synthesize_speech, transcribe_audio
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Security constants for voice processing
+MAX_AUDIO_SIZE = 10 * 1024 * 1024  # 10MB max audio file size
+ALLOWED_AUDIO_TYPES = {"audio/wav", "audio/x-wav"}
+
 # ---------------------------------------------------------------------------
 # Application
 # ---------------------------------------------------------------------------
@@ -192,12 +196,26 @@ async def voice_transcribe(
     Audio bytes are processed in memory and never persisted.
     """
     if not consent:
+    
+    # Validate file type
+    if audio.content_type not in ALLOWED_AUDIO_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported audio type: {audio.content_type}. Only WAV files are accepted.",
+        )
         raise HTTPException(
             status_code=403,
             detail="Explicit consent is required for voice processing.",
         )
     try:
         audio_bytes = await audio.read()
+        
+        # Validate file size
+        if len(audio_bytes) > MAX_AUDIO_SIZE:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Audio file too large. Maximum: {MAX_AUDIO_SIZE // (1024*1024)}MB.",
+            )
         text = transcribe_audio(audio_bytes)
         return {"text": text, "local": True, "engine": "vosk"}
     except (RuntimeError, ValueError) as exc:
