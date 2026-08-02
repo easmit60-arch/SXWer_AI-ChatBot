@@ -1266,7 +1266,7 @@ app.get("/", (req, res) => {
 /**
  * GET /consent-ledger - Serve Consent Ledger UI page
  */
-app.get("/consent-ledger", (req, res) => {
+app.get("/consent-ledger", limiter, (req, res) => {
   res.sendFile(path.join(__dirname, "public", "consent-ledger.html"));
 });
 
