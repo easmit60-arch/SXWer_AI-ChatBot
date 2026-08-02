@@ -1144,6 +1144,33 @@ export class EthicalChatBot {
 }
 
 // ============================================================================
+// ============================================================================
+// SECTION 7: TOOL INTEGRATION
+// ============================================================================
+
+/**
+ * Handle tool commands with ethical constraints
+ * @param {string} userInput - User input
+ * @param {Object} options - Options
+ * @returns {HumanNLPResponse|null} Formatted response or null if not a tool command
+ */
+async function handleToolRequest(userInput, options = {}) {
+  try {
+    // Import tools dynamically to avoid circular dependency
+    const toolsModule = await import("./tools.js");
+    
+    return await toolsModule.handleToolCommand(userInput, {
+      ...options,
+      formatHumanNLP,
+      truncateForMirror,
+    });
+  } catch (error) {
+    console.error("Tool handling error:", error);
+    return null;
+  }
+}
+
+
 // SECTION 7: EXPORTS AND UTILITIES
 // ============================================================================
 
@@ -1152,6 +1179,7 @@ export const chatbot = new EthicalChatBot();
 
 // Export all individual functions for modular use
 export {
+  handleToolRequest,
   CORE_PRINCIPLES,
   BOUNDARY_STATEMENTS,
   CRISIS_RESOURCES,

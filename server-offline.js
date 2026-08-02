@@ -407,6 +407,7 @@ import {
   formatHumanNLP,
   truncateForMirror,
 } from "./chatbot.js";
+  handleToolRequest,
 
 // ============================================================================
 // SHERLOCK OFFLINE IMPLEMENTATION
@@ -689,6 +690,22 @@ app.post("/api/chat", validateChatInput, csrfProtection, requireAuth, async (req
     }
 
     // Check for Sherlock command
+    // Check for tool commands
+    const toolResponse = await handleToolRequest(message, {
+      sessionId,
+      hasToolConsent: hasToolConsent(sessionId),
+      formatHumanNLP,
+      truncateForMirror,
+    });
+    if (toolResponse) {
+      return res.json({
+        response: formatResponseForDisplay(toolResponse),
+        isTool: true,
+        tool: toolResponse.tool,
+      });
+    }
+    
+
     if (message && message.startsWith("/sherlock ")) {
       const username = message.substring(10).trim();
 
@@ -767,7 +784,10 @@ app.post("/api/chat", validateChatInput, csrfProtection, requireAuth, async (req
         reframe:
           "These organizations provide support, advocacy, and resources:",
         rapport:
-          "Type /sherlock username - Check username\n/moxie message - Talk to Moxie\n/consent yes - Enable AI\n/consent no - Disable AI\n/resources - Show this list",
+          "Type /sherlock username - Check username (safety verification only)\n/moxie message - Talk to Moxie\n/consent yes - Enable AI
+/get_time - Get current time
+/translate text to language - Translate text
+/sherlock_ai username - AI-enhanced safety verification\n/consent no - Disable AI\n/resources - Show this list",
       });
 
       // Include resources in the response
