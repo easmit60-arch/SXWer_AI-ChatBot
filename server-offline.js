@@ -99,7 +99,6 @@ let localModel = null;
 let modelLoaded = false;
 const DEFAULT_LOCAL_PERMISSIONS = Object.freeze({
   offline: false,
-  grantedAt: null,
   scope: "offline",
 });
 const localPermissionStore = new Map();
@@ -132,9 +131,12 @@ function setLocalPermissions(sessionId = "default", permissions = {}) {
   const normalizedSessionId = resolveSessionId(sessionId);
   const localPermissionState = {
     offline: Boolean(permissions.offline),
-    grantedAt: permissions.grantedAt || null,
     scope: permissions.scope || "offline",
   };
+  if (!localPermissionState.offline) {
+    localPermissionStore.delete(normalizedSessionId);
+    return { ...DEFAULT_LOCAL_PERMISSIONS };
+  }
   localPermissionStore.set(normalizedSessionId, localPermissionState);
   return localPermissionState;
 }
@@ -223,6 +225,8 @@ import {
   requestSherlockConsent,
   formatHumanNLP,
   truncateForMirror,
+  detectBiasInAIResponse,
+  createAIExplanation,
 } from "./chatbot.js";
 
 // ============================================================================
@@ -388,6 +392,44 @@ function buildOnlineResponse(message, aiText) {
       "Would you like to continue exploring this, or would you prefer a local-only response?",
     isAI: true,
   });
+}
+
+function buildBiasMitigatedResponse(message, biasAssessment) {
+  const issueSummary = biasAssessment.issues
+    .map((issue) => issue.description)
+    .join(", ");
+
+  return formatHumanNLP({
+    userInput: message,
+    anchor: "I adjusted this reply to keep it safer and less biased.",
+    mirror: `You asked: "${truncateForMirror(message)}"`,
+    reframe:
+      `I did not show the raw AI text because it included language that could feel harmful or stigmatizing (${issueSummary}). ` +
+      "Instead, I’m keeping the response grounded in dignity, autonomy, and non-judgment.",
+    rapport:
+      "Would you like a local-only response, a different framing, or support resources instead?",
+    isAI: true,
+  });
+}
+
+function buildExplainedAIResult(message, aiText, provider, mode = "offline") {
+  const biasAssessment = detectBiasInAIResponse(aiText);
+  const usedFallback = biasAssessment.flagged;
+  const response = usedFallback
+    ? buildBiasMitigatedResponse(message, biasAssessment)
+    : buildOnlineResponse(message, aiText);
+
+  return {
+    response,
+    explanation: createAIExplanation({
+      provider,
+      mode,
+      biasAssessment,
+      usedFallback,
+    }),
+    biasAssessment,
+    aiSafeguarded: usedFallback,
+  };
 }
 
 // ============================================================================
@@ -758,12 +800,20 @@ app.post("/api/chat", async (req, res) => {
       // 1. Python local LLM (Ollama — no external API, highest privacy)
       const localLLMText = await callPythonLocalLLM(message, sessionId);
       if (localLLMText) {
-        const localLLMResponse = buildOnlineResponse(message, localLLMText);
+        const localLLMResult = buildExplainedAIResult(
+          message,
+          localLLMText,
+          "ollama",
+          "offline",
+        );
         return res.json({
-          response: formatResponseForDisplay(localLLMResponse),
+          response: formatResponseForDisplay(localLLMResult.response),
           offline: true,
           provider: "ollama",
           aiAssisted: true,
+          explanation: localLLMResult.explanation,
+          biasAssessment: localLLMResult.biasAssessment,
+          aiSafeguarded: localLLMResult.aiSafeguarded,
           nlp: pythonNlp,
         });
       }
@@ -772,14 +822,22 @@ app.post("/api/chat", async (req, res) => {
       if (onlineApiActive) {
         try {
           const aiText = await callOnlineModel(message);
-          const onlineResponse = buildOnlineResponse(message, aiText);
+          const onlineResult = buildExplainedAIResult(
+            message,
+            aiText,
+            "mistral",
+            "online",
+          );
           return res.json({
-            response: formatResponseForDisplay(onlineResponse),
+            response: formatResponseForDisplay(onlineResult.response),
             offline: false,
             online: true,
             provider: "mistral",
             model: MISTRAL_MODEL,
             aiAssisted: true,
+            explanation: onlineResult.explanation,
+            biasAssessment: onlineResult.biasAssessment,
+            aiSafeguarded: onlineResult.aiSafeguarded,
             nlp: pythonNlp,
           });
         } catch (error) {
@@ -855,7 +913,6 @@ app.post("/api/local-permissions", (req, res) => {
 
   const localPermissionState = setLocalPermissions(sessionId, {
     offline: granted,
-    grantedAt: granted ? new Date().toISOString() : null,
     scope: scope || "offline",
   });
 
