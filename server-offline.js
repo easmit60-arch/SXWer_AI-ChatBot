@@ -23,6 +23,8 @@ import express from "express";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
+import cookieParser from "cookie-parser";
+import csrf from "csrf";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
@@ -68,6 +70,12 @@ const limiter = rateLimit({
 
 // Apply rate limiting to all API routes
 app.use("/api/", limiter);
+
+// Cookie parser for CSRF token handling
+app.use(cookieParser());
+
+// CSRF protection setup
+const csrfProtection = csrf({ cookie: true });
 
 // ============================================================================
 // SECURITY MIDDLEWARE
@@ -613,7 +621,7 @@ async function callPythonNLP(text, sessionId = "default") {
  * POST /chat - Handle chat messages
  * Enforces all ethical constraints
  */
-app.post("/api/chat", validateChatInput, async (req, res) => {
+app.post("/api/chat", validateChatInput, csrfProtection, async (req, res) => {
   try {
     const { message, consent, localPermissions, mode } = req.body;
     const sessionId = getSessionIdFromRequest(req);
@@ -961,7 +969,7 @@ app.get("/api/python-status", async (req, res) => {
 /**
  * GET /moxie-checkin - Moxie gentle check-in endpoint
  */
-app.post("/api/local-permissions", (req, res) => {
+app.post("/api/local-permissions", csrfProtection, (req, res) => {
   const sessionId = getSessionIdFromRequest(req);
   const { allow, scope } = req.body || {};
   const granted = Boolean(allow);
@@ -1052,7 +1060,7 @@ app.get("/api/consent-status", (req, res) => {
 /**
  * POST /consent - Set consent
  */
-app.post("/api/consent", (req, res) => {
+app.post("/api/consent", csrfProtection, (req, res) => {
   const sessionId = getSessionIdFromRequest(req);
   const { ai, tools } = req.body;
   setUserConsent(ai, tools, sessionId);

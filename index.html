@@ -1816,11 +1816,13 @@
         setStatus("Thinking...", false, true);
 
         try {
+          const token = await getCsrfToken();
           const response = await fetch("/api/chat", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
               "x-session-id": sessionId,
+              "x-csrf-token": token,
             },
             body: JSON.stringify({
               message: messageText,
