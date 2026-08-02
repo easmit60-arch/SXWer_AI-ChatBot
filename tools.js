@@ -264,9 +264,10 @@ function parseToolCommand(input) {
     return { tool: "sherlock_ai", args, isTool: true };
   }
   
-  // Check for prohibited tools
+  // Check for prohibited tools (only when explicitly invoked)
+  const lower = trimmed.toLowerCase();
   for (const toolName of Object.keys(PROHIBITED_TOOLS)) {
-    if (trimmed.toLowerCase().includes(toolName)) {
+    if (lower.startsWith(`/${toolName}`) || lower.startsWith(toolName)) {
       return { tool: toolName, args: [], isTool: true, prohibited: true };
     }
   }
