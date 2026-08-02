@@ -1,0 +1,115 @@
+:root {
+  --bg: #f7f5ef;
+  --panel: #ffffff;
+  --text: #111111;
+  --muted: #5c5c5c;
+  --accent: #7d2cff;
+  --accent-2: #ff2d95;
+  --border: #d6d6d6;
+  --danger: #9c174e;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+}
+.skip-link {
+  position: absolute;
+  left: -999px;
+  top: 0;
+}
+.skip-link:focus {
+  left: 1rem;
+  top: 1rem;
+  background: #fff;
+  padding: 0.75rem 1rem;
+  z-index: 1000;
+}
+header, footer {
+  padding: 1rem 1.25rem;
+  background: linear-gradient(135deg, var(--accent-2), var(--accent));
+  color: #fff;
+}
+header a, footer a, nav a { color: inherit; }
+main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+nav ul {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+nav a {
+  display: inline-block;
+  padding: 0.45rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.14);
+  text-decoration: none;
+}
+nav a[aria-current="page"] {
+  background: #fff;
+  color: var(--accent);
+  font-weight: 700;
+}
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+button {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.75rem 1rem;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+button.secondary { background: var(--accent-2); }
+button.danger { background: var(--danger); }
+button:focus-visible, a:focus-visible {
+  outline: 3px solid #000;
+  outline-offset: 3px;
+}
+.table-wrap { overflow: auto; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+th, td {
+  border-bottom: 1px solid var(--border);
+  padding: 0.6rem;
+  text-align: left;
+  vertical-align: top;
+}
+code, pre {
+  background: #f3eefb;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+}
+pre { white-space: pre-wrap; padding: 1rem; }
+.notice {
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

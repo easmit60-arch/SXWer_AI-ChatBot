@@ -10,6 +10,9 @@ A trauma-informed, privacy-first chat experience built for calm, local use. The 
 - A Moxie desktop companion with check-ins and a floating widget in [index.html](index.html) and [public/moxie.css](public/moxie.css)
 - Optional online AI support through a Mistral-compatible API when environment variables are configured
 - Optional Python microservice in [python/](python/) for enhanced NLP, local LLM inference, and voice processing
+- Versioned, granular consent with per-scope defaults kept off until the user enables them
+- Human-rights dashboards for privacy, consent, data inspection, export, deletion, transparency, explainability, accessibility, and security
+- Current-session audit and transparency records that the user can inspect, export, and delete
 
 ## Core principles
 
@@ -51,6 +54,8 @@ You can use the app in a few simple ways:
 - Use /sherlock username for your own safety verification only, after consent.
 - Use /moxie message to talk with Moxie, your desktop companion.
 - Use /resources to view support resources.
+- Open `/human-rights-report` for the current-session rights, privacy, and security report.
+- Open `/privacy-dashboard`, `/consent-dashboard`, `/data-manager`, or `/explain-this-response` for focused control pages.
 
 ## Optional online AI
 
@@ -105,10 +110,34 @@ See [python/README.md](python/README.md) for full setup instructions, including 
 - The default experience is local-first and does not require external services.
 - The Python microservice processes everything on-device and stores nothing.
 - AI-assisted replies include a short explanation of the provider, data use, and safety checks.
+- Every chat response now returns structured transparency metadata, and the latest response can be inspected in Explain This Response.
 - AI replies are screened for high-confidence bias markers before they are shown.
 - Do not commit real API keys or secrets.
 - Keep sensitive values in a local .env file.
 - The app is not a substitute for professional medical, legal, or crisis services.
+
+## Human-rights control surfaces
+
+These pages all run locally and use the current session only:
+
+- `/privacy-dashboard`
+- `/consent-dashboard`
+- `/data-manager`
+- `/export-center`
+- `/delete-my-data`
+- `/transparency-center`
+- `/accessibility-center`
+- `/ai-disclosure`
+- `/human-rights-report`
+- `/security-status`
+- `/explain-this-response`
+
+The dashboards expose:
+
+- versioned consent metadata with policy/schema/app versions and per-scope states
+- a data inventory covering identity, device, location, usage, technical logs, behavioral data, communications, AI history, sensor permissions, metadata, and infrastructure telemetry
+- export and deletion controls for current-session transparency records
+- security and accessibility status summaries
 
 ## Optional blockchain consent ledger
 

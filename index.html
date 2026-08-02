@@ -107,6 +107,30 @@
         margin: 0 auto;
       }
 
+      .rights-nav {
+        margin-top: 16px;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px;
+      }
+
+      .rights-nav a {
+        color: var(--white);
+        background: rgba(255, 255, 255, 0.18);
+        border-radius: 999px;
+        padding: 8px 12px;
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .rights-nav a:focus-visible,
+      .rights-nav a:hover {
+        outline: 2px solid var(--white);
+        outline-offset: 2px;
+      }
+
       /* ========================================================================
          CHAT AREA - Safe, Readable, Accessible
          ======================================================================== */
@@ -945,6 +969,13 @@
           Trauma-informed support tool with Moxie, your desktop companion. Your
           pace, your choices.
         </p>
+        <nav class="rights-nav" aria-label="Transparency and data rights">
+          <a href="/human-rights-report">Human Rights Report</a>
+          <a href="/privacy-dashboard">Privacy Dashboard</a>
+          <a href="/consent-dashboard">Consent Dashboard</a>
+          <a href="/data-manager">Data Manager</a>
+          <a href="/explain-this-response">Explain This Response</a>
+        </nav>
         <div class="mode-toggle">
           <button id="dark-mode-toggle" type="button" title="Toggle Dark Mode">
             Dark mode
