@@ -20,6 +20,8 @@
 
 import "dotenv/config";
 import express from "express";
+import cors from "cors";
+import rateLimit from "express-rate-limit";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
@@ -30,9 +32,35 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const MAX_MESSAGE_LENGTH = Number(process.env.MAX_MESSAGE_LENGTH || 4000);
+const SESSION_ID_PATTERN = /^[a-zA-Z0-9_-]{1,64}$/;
+const ALLOWED_ORIGINS = (process.env.CORS_ALLOWED_ORIGINS ||
+  "http://localhost:3000,http://127.0.0.1:3000")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 // Middleware
-app.use(express.json({ limit: "10mb" }));
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error("CORS origin not allowed"));
+    },
+  }),
+);
+app.use(
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: "Too many requests, please try again later.",
+  }),
+);
+app.use(express.json({ limit: "1mb" }));
 app.use("/public", express.static(path.join(__dirname, "public"), { index: false }));
 
 // ============================================================================
@@ -56,7 +84,7 @@ const PYTHON_API_URL = process.env.PYTHON_API_URL || "";
 console.log(`\nSXWer AI ChatBot - ${OFFLINE_MODE ? "OFFLINE" : "ONLINE"} Mode`);
 console.log(`Model Path: ${LOCAL_MODEL_PATH}`);
 console.log(
-  `Online API: ${ONLINE_API_ENABLED && MISTRAL_API_KEY ? "configured" : "disabled"}`,
+  `Online API: ${ONLINE_API_ENABLED ? "available when configured" : "disabled"}`,
 );
 console.log(
   `Python service: ${PYTHON_API_URL ? PYTHON_API_URL : "not configured (optional)"}`,
@@ -79,7 +107,16 @@ const pendingSherlockStore = new Map();
 
 function resolveSessionId(sessionId = "default") {
   const normalized = String(sessionId || "default").trim();
+  if (!SESSION_ID_PATTERN.test(normalized)) {
+    return "default";
+  }
   return normalized || "default";
+}
+
+function sanitizeUserMessage(input) {
+  return String(input ?? "")
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
+    .trim();
 }
 
 function getSessionIdFromRequest(req) {
@@ -453,11 +490,23 @@ async function callPythonNLP(text, sessionId = "default") {
  */
 app.post("/api/chat", async (req, res) => {
   try {
-    const { message, consent, localPermissions, mode } = req.body;
+    const { message: rawMessage, consent, localPermissions, mode } = req.body;
     const sessionId = getSessionIdFromRequest(req);
+    const message = sanitizeUserMessage(rawMessage);
     const requestedMode = getRequestedMode(mode);
     const onlineModeAllowed = shouldAllowOnlineMode(requestedMode);
     const onlineApiActive = shouldUseOnlineApi(requestedMode);
+
+    if (!message) {
+      return res.status(400).json({
+        error: "Message is required and must be a non-empty string.",
+      });
+    }
+    if (message.length > MAX_MESSAGE_LENGTH) {
+      return res.status(400).json({
+        error: `Message exceeds maximum length of ${MAX_MESSAGE_LENGTH} characters.`,
+      });
+    }
 
     // Update consent if provided
     if (consent && typeof consent === "object") {
@@ -893,6 +942,11 @@ app.get("/api/consent-status", (req, res) => {
 app.post("/api/consent", (req, res) => {
   const sessionId = getSessionIdFromRequest(req);
   const { ai, tools } = req.body;
+  if (typeof ai !== "boolean" || typeof tools !== "boolean") {
+    return res.status(400).json({
+      error: "Consent values must be booleans for both ai and tools.",
+    });
+  }
   setUserConsent(ai, tools, sessionId);
 
   res.json({
