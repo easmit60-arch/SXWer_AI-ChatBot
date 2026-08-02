@@ -25,6 +25,7 @@ import {
   hasAIConsent,
   hasToolConsent,
   setUserConsent,
+  getConsentState,
   checkSherlockProtocol,
   requestSherlockConsent,
   formatHumanNLP,
@@ -64,6 +65,15 @@ function jsonResponse(data, status = 200) {
     status,
     headers: { "Content-Type": "application/json" },
   });
+}
+
+function resolveSessionId(value = "default") {
+  const normalized = String(value || "default").trim();
+  return normalized || "default";
+}
+
+function getRequestedMode(mode = "offline") {
+  return String(mode).toLowerCase() === "online" ? "online" : "offline";
 }
 
 /**
@@ -167,11 +177,15 @@ async function handleChat(request, env) {
     return jsonResponse({ error: "Invalid JSON body" }, 400);
   }
 
-  const { message, consent, localPermissions } = body;
+  const { message, consent, localPermissions, mode } = body;
+  const sessionId = resolveSessionId(
+    body?.sessionId || request.headers.get("x-session-id") || "default",
+  );
+  const requestedMode = getRequestedMode(mode);
 
   // [REQ 3] Apply per-request consent before any processing
   if (consent && typeof consent === "object") {
-    setUserConsent(Boolean(consent.ai), Boolean(consent.tools));
+    setUserConsent(Boolean(consent.ai), Boolean(consent.tools), sessionId);
   }
 
   // Validate message
@@ -197,9 +211,24 @@ async function handleChat(request, env) {
     // /sherlock command
     if (message.startsWith("/sherlock ")) {
       const username = message.substring(10).trim();
-      const protocolCheck = checkSherlockProtocol(message);
+      const protocolCheck = checkSherlockProtocol(message, { sessionId });
 
-      if (!protocolCheck.allowed || !hasToolConsent()) {
+      if (!protocolCheck.allowed && protocolCheck.reason !== "EXPLICIT_CONSENT_REQUIRED") {
+        return jsonResponse({
+          response: formatResponseForDisplay(
+            formatHumanNLP({
+              userInput: message,
+              anchor: "I need to ensure Sherlock is used appropriately.",
+              mirror: `You requested: "${message}"`,
+              reframe: protocolCheck.message,
+              rapport:
+                "Would you like to rephrase this as a safety check for your own username?",
+            }),
+          ),
+        });
+      }
+
+      if (!protocolCheck.allowed || !hasToolConsent(sessionId)) {
         return jsonResponse({
           response: formatResponseForDisplay(requestSherlockConsent(username)),
           requiresConsent: true,
@@ -207,7 +236,7 @@ async function handleChat(request, env) {
         });
       }
 
-      // Workers are online-only; Sherlock is not available without the Apify token.
+      // Workers are online-only; Sherlock is not available in the cloud deployment.
       // Return a transparent "not available in cloud mode" response.
       const sherockUnavailable = formatHumanNLP({
         userInput: message,
@@ -270,7 +299,7 @@ async function handleChat(request, env) {
       message.toLowerCase() === "yes" ||
       message.toLowerCase() === "/consent yes"
     ) {
-      setUserConsent(true, true);
+      setUserConsent(true, true, sessionId);
       const response = formatHumanNLP({
         userInput: message,
         anchor: "Thank you for your consent.",
@@ -284,7 +313,7 @@ async function handleChat(request, env) {
       return jsonResponse({
         response: formatResponseForDisplay(response),
         consentGranted: true,
-        consent: { ai: true, tools: true },
+        consent: getConsentState(sessionId),
       });
     }
 
@@ -293,7 +322,7 @@ async function handleChat(request, env) {
       message.toLowerCase() === "no" ||
       message.toLowerCase() === "/consent no"
     ) {
-      setUserConsent(false, false);
+      setUserConsent(false, false, sessionId);
       const response = formatHumanNLP({
         userInput: message,
         anchor: "Consent revoked.",
@@ -306,19 +335,24 @@ async function handleChat(request, env) {
       return jsonResponse({
         response: formatResponseForDisplay(response),
         consentRevoked: true,
-        consent: { ai: false, tools: false },
+        consent: getConsentState(sessionId),
       });
     }
 
     // General message — process through ethical chatbot
     const localResponse = chatbot.processMessage(message, {
       isSherlockRequest: false,
-      forceLocal: !hasAIConsent(),
+      forceLocal: !hasAIConsent(sessionId),
+      sessionId,
     });
 
     // [REQ 1] Only call online AI when the user has explicitly consented
     // [REQ 3] Check consent before any external API call
-    if (hasAIConsent() && (env.MISTRAL_API_KEY || "")) {
+    if (
+      requestedMode === "online" &&
+      hasAIConsent(sessionId) &&
+      (env.MISTRAL_API_KEY || "")
+    ) {
       try {
         const aiText = await callOnlineModel(message, env);
         const onlineResponse = buildOnlineResponse(message, aiText);
@@ -341,8 +375,8 @@ async function handleChat(request, env) {
 
     return jsonResponse({
       response: formatResponseForDisplay(localResponse),
-      offline: true,
-      online: false,
+      offline: requestedMode !== "online",
+      online: requestedMode === "online" && Boolean(env.MISTRAL_API_KEY),
     });
   } catch (error) {
     console.error("[WORKER] Chat error:", error);
@@ -375,10 +409,15 @@ function handleHealth(env) {
 }
 
 /** GET /api/consent-status */
-function handleConsentStatus() {
+function handleConsentStatus(request) {
+  const sessionId = resolveSessionId(
+    new URL(request.url).searchParams.get("sessionId") ||
+      request.headers.get("x-session-id") ||
+      "default",
+  );
   return jsonResponse({
-    ai: hasAIConsent(),
-    tools: hasToolConsent(),
+    ai: hasAIConsent(sessionId),
+    tools: hasToolConsent(sessionId),
     offlineMode: false,
     modelLoaded: false,
     model: null,
@@ -393,11 +432,14 @@ async function handleSetConsent(request) {
   } catch {
     return jsonResponse({ error: "Invalid JSON body" }, 400);
   }
+  const sessionId = resolveSessionId(
+    body?.sessionId || request.headers.get("x-session-id") || "default",
+  );
   const { ai, tools } = body;
-  setUserConsent(ai, tools);
+  setUserConsent(ai, tools, sessionId);
   return jsonResponse({
     success: true,
-    consent: { ai: hasAIConsent(), tools: hasToolConsent() },
+    consent: getConsentState(sessionId),
   });
 }
 
@@ -487,7 +529,7 @@ export default {
       return handleHealth(env);
     }
     if (pathname === "/api/consent-status" && method === "GET") {
-      return handleConsentStatus();
+      return handleConsentStatus(request);
     }
     if (pathname === "/api/consent" && method === "POST") {
       return handleSetConsent(request);

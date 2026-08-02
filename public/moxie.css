@@ -225,15 +225,6 @@
   opacity: 1;
 }
 
-#moxie-paperclip::after::before {
-  content: "";
-  position: absolute;
-  top: -6px;
-  right: 15px;
-  border: 6px solid transparent;
-  border-top-color: #111111;
-}
-
 /* Moxie Color Variables */
 :root {
   --moxie-pink: #ff2d95;

@@ -7,7 +7,7 @@ A trauma-informed, privacy-first chat experience built for calm, local use. The 
 - A local web server in [server-offline.js](server-offline.js)
 - Ethical response formatting and consent checks in [chatbot.js](chatbot.js)
 - A simple chat UI with a help popup, dark/light mode, and clear input flow in [index.html](index.html)
-- A Moxie desktop companion with check-ins and a floating widget in [index.html](index.html) and [moxie.css](moxie.css)
+- A Moxie desktop companion with check-ins and a floating widget in [index.html](index.html) and [public/moxie.css](public/moxie.css)
 - Optional online AI support through a Mistral-compatible API when environment variables are configured
 - Optional Python microservice in [python/](python/) for enhanced NLP, local LLM inference, and voice processing
 
@@ -53,7 +53,7 @@ You can use the app in a few simple ways:
 
 ## Optional online AI
 
-The app works well offline by default. If you want to use an online model, copy [.env.example](.env.example) to .env and update the values:
+The app works well offline by default. If you want to use an online model, copy [.env.example](.env.example) to .env and update the values. The Node server now loads `.env` automatically at startup:
 
 ```bash
 cp .env.example .env
@@ -69,7 +69,7 @@ If these values are not set, the app stays in its safe offline mode.
 
 ## Optional Python microservice
 
-The [python/](python/) directory adds enhanced capabilities through a FastAPI service that runs alongside the Node server. Everything runs locally — no data leaves your device.
+The [python/](python/) directory adds enhanced capabilities through a FastAPI service that runs alongside the Node server. Everything runs locally — no data leaves your device. The Python service now auto-loads a local `.env` file on startup as well.
 
 | Feature | Description |
 |---------|-------------|
@@ -96,7 +96,7 @@ Then add to your `.env`:
 PYTHON_API_URL=http://localhost:8000
 ```
 
-The Node server falls back gracefully if the Python service is not running.
+The Node server falls back gracefully if the Python service is not running. In the Node-only path, local model files are treated as assets/metadata; real on-device inference happens through the Python + Ollama path.
 See [python/README.md](python/README.md) for full setup instructions, including Ollama and voice pipeline setup.
 
 ## Privacy and safety

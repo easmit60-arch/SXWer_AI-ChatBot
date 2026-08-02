@@ -32,6 +32,8 @@ Add to your `.env` file:
 PYTHON_API_URL=http://localhost:8000
 ```
 
+`app.py` auto-loads this `.env` file when the service starts.
+
 The Node.js server will automatically use the Python service for enhanced
 safety scoring and local LLM inference when it is running.
 

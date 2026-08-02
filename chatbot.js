@@ -110,23 +110,32 @@ const CRISIS_RESOURCES = Object.freeze({
  * Default consent state: NO consent for AI or tools
  * This enforces Requirement 1: "By default, NO generative AI should be used"
  */
-let userConsent = Object.freeze({
+const DEFAULT_CONSENT = Object.freeze({
   ai: false,
   tools: false,
 });
+
+const consentStore = new Map();
+
+function normalizeSessionId(sessionId = "default") {
+  const normalized = String(sessionId || "default").trim();
+  return normalized || "default";
+}
 
 /**
  * Set user consent for AI and/or tools
  * @param {boolean} aiConsent - Consent for AI usage
  * @param {boolean} toolsConsent - Consent for tool usage
  */
-function setUserConsent(aiConsent = false, toolsConsent = false) {
-  userConsent = Object.freeze({
+function setUserConsent(aiConsent = false, toolsConsent = false, sessionId = "default") {
+  const normalizedSessionId = normalizeSessionId(sessionId);
+  const consentState = Object.freeze({
     ai: Boolean(aiConsent),
     tools: Boolean(toolsConsent),
   });
+  consentStore.set(normalizedSessionId, consentState);
   // Do not log consent values — they are sensitive user state
-  console.log("[CONSENT] Consent state updated.");
+  console.log("[CONSENT] Consent state updated for session.");
 
   // Audit log for transparency (no values logged)
   if (aiConsent) {
@@ -141,24 +150,27 @@ function setUserConsent(aiConsent = false, toolsConsent = false) {
  * Check if AI usage is permitted
  * @returns {boolean} True if user has explicitly consented to AI
  */
-function hasAIConsent() {
-  return userConsent.ai === true;
+function hasAIConsent(sessionId = "default") {
+  return getConsentState(sessionId).ai === true;
 }
 
 /**
  * Check if tool usage is permitted
  * @returns {boolean} True if user has explicitly consented to tools
  */
-function hasToolConsent() {
-  return userConsent.tools === true;
+function hasToolConsent(sessionId = "default") {
+  return getConsentState(sessionId).tools === true;
 }
 
 /**
  * Get current consent state (immutable copy)
  * @returns {UserConsent} Current consent state
  */
-function getConsentState() {
-  return Object.freeze({ ...userConsent });
+function getConsentState(sessionId = "default") {
+  const normalizedSessionId = normalizeSessionId(sessionId);
+  return Object.freeze({
+    ...(consentStore.get(normalizedSessionId) || DEFAULT_CONSENT),
+  });
 }
 
 // ============================================================================
@@ -603,6 +615,7 @@ function createSafeResponse(userInput, options = {}) {
     forceLocal = false,
     isSherlockRequest = false,
     username = null,
+    sessionId = "default",
   } = options;
 
   // Step 1: Crisis detection (highest priority)
@@ -632,7 +645,7 @@ function createSafeResponse(userInput, options = {}) {
   }
 
   // Step 3: Check AI consent (Requirement 1)
-  if (!hasAIConsent() || forceLocal) {
+  if (!hasAIConsent(sessionId) || forceLocal) {
     return formatHumanNLP({
       userInput,
       anchor: `I hear what you're sharing.`,
@@ -710,17 +723,8 @@ const SHERLOCK_PROTOCOL = Object.freeze({
  * @param {string} userRequest - The user's request
  * @returns {Object} Protocol check result
  */
-function checkSherlockProtocol(userRequest) {
-  if (!hasToolConsent()) {
-    return Object.freeze({
-      allowed: false,
-      reason: "EXPLICIT_CONSENT_REQUIRED",
-      message:
-        "Sherlock requires your explicit consent. Please confirm you want to use this tool for safety/verification purposes only.",
-      action: "REQUEST_CONSENT",
-    });
-  }
-
+function checkSherlockProtocol(userRequest, options = {}) {
+  const { sessionId = "default" } = options;
   const lowerRequest = userRequest.toLowerCase();
 
   // Check for forbidden purposes
@@ -752,12 +756,29 @@ function checkSherlockProtocol(userRequest) {
     }
   }
 
+  if (lowerRequest.startsWith("/sherlock ")) {
+    const usernameCheck = validateSherlockUsername(userRequest.slice(10).trim());
+    if (usernameCheck.valid) {
+      hasAllowedPurpose = true;
+    }
+  }
+
   if (!hasAllowedPurpose) {
     return Object.freeze({
       allowed: false,
       reason: "PURPOSE_UNCLEAR",
       message: `To use Sherlock, please confirm this is for your own safety verification. ${SHERLOCK_PROTOCOL.explanation}`,
       action: "CLARIFY_PURPOSE",
+    });
+  }
+
+  if (!hasToolConsent(sessionId)) {
+    return Object.freeze({
+      allowed: false,
+      reason: "EXPLICIT_CONSENT_REQUIRED",
+      message:
+        "Sherlock requires your explicit consent. Please confirm you want to use this tool for safety/verification purposes only.",
+      action: "REQUEST_CONSENT",
     });
   }
 
@@ -864,6 +885,7 @@ export class EthicalChatBot {
       isSherlockRequest = false,
       username = null,
       forceLocal = false,
+      sessionId = "default",
     } = options;
 
     // Input validation
@@ -898,13 +920,13 @@ export class EthicalChatBot {
 
     // Step 3: Sherlock protocol check (Requirement 3)
     if (isSherlockRequest) {
-      const response = this.handleSherlockRequest(message, username);
+      const response = this.handleSherlockRequest(message, username, sessionId);
       this.addToHistory("assistant", formatResponseForDisplay(response));
       return response;
     }
 
     // Step 4: AI consent check (Requirement 1)
-    if (!hasAIConsent() || forceLocal) {
+    if (!hasAIConsent(sessionId) || forceLocal) {
       const response = this.requestAIConsent(message);
       this.addToHistory("assistant", formatResponseForDisplay(response));
       return response;
@@ -990,7 +1012,7 @@ export class EthicalChatBot {
    * @param {string} username - Username to check
    * @returns {HumanNLPResponse} Protocol-compliant response
    */
-  handleSherlockRequest(message, username) {
+  handleSherlockRequest(message, username, sessionId = "default") {
     // Do not log the username — it is personal user data
     console.log("[TOOL] Sherlock request received.");
 
@@ -1006,7 +1028,7 @@ export class EthicalChatBot {
       });
     }
 
-    const protocolCheck = checkSherlockProtocol(message);
+    const protocolCheck = checkSherlockProtocol(message, { sessionId });
 
     if (!protocolCheck.allowed) {
       return formatHumanNLP({
@@ -1019,7 +1041,7 @@ export class EthicalChatBot {
     }
 
     // If we get here, protocol is satisfied but we still need explicit consent
-    if (!hasToolConsent()) {
+    if (!hasToolConsent(sessionId)) {
       return requestSherlockConsent(username || message);
     }
 
@@ -1113,7 +1135,6 @@ export {
   SHERLOCK_KEYWORDS,
   CRISIS_KEYWORDS,
   SHERLOCK_PROTOCOL,
-  userConsent,
   setUserConsent,
   hasAIConsent,
   hasToolConsent,

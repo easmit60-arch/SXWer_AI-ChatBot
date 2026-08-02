@@ -5,7 +5,7 @@
  * No API keys, Cloudflare Workers, or network connections required
  *
  * Features:
- * - Local Mistral model inference
+ * - Offline-first local responses with optional Python/Ollama inference
  * - Moxie companion integration
  * - Sherlock command-only interface
  * - Riot Grrrl CSS palette
@@ -18,6 +18,7 @@
  * - safe support flows for crisis and sensitive contexts
  */
 
+import "dotenv/config";
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -32,6 +33,7 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(express.json({ limit: "10mb" }));
+app.use("/public", express.static(path.join(__dirname, "public"), { index: false }));
 
 // ============================================================================
 // OFFLINE MODE CONFIGURATION
@@ -67,47 +69,88 @@ console.log(`Server: http://localhost:${PORT}\n`);
 
 let localModel = null;
 let modelLoaded = false;
-let localPermissionState = { offline: false };
+const DEFAULT_LOCAL_PERMISSIONS = Object.freeze({
+  offline: false,
+  grantedAt: null,
+  scope: "offline",
+});
+const localPermissionStore = new Map();
 
-function setLocalPermissions(permissions = {}) {
-  localPermissionState = {
+function resolveSessionId(sessionId = "default") {
+  const normalized = String(sessionId || "default").trim();
+  return normalized || "default";
+}
+
+function getSessionIdFromRequest(req) {
+  return resolveSessionId(
+    req.body?.sessionId ||
+      req.get("x-session-id") ||
+      req.query?.sessionId ||
+      "default",
+  );
+}
+
+function setLocalPermissions(sessionId = "default", permissions = {}) {
+  const normalizedSessionId = resolveSessionId(sessionId);
+  const localPermissionState = {
     offline: Boolean(permissions.offline),
     grantedAt: permissions.grantedAt || null,
     scope: permissions.scope || "offline",
   };
+  localPermissionStore.set(normalizedSessionId, localPermissionState);
+  return localPermissionState;
 }
 
-function hasOfflineLocalPermission() {
-  return localPermissionState.offline === true;
+function getLocalPermissions(sessionId = "default") {
+  return {
+    ...(localPermissionStore.get(resolveSessionId(sessionId)) ||
+      DEFAULT_LOCAL_PERMISSIONS),
+  };
+}
+
+function hasOfflineLocalPermission(sessionId = "default") {
+  return getLocalPermissions(sessionId).offline === true;
+}
+
+function getRequestedMode(mode = "offline") {
+  return String(mode).toLowerCase() === "online" ? "online" : "offline";
+}
+
+function shouldAllowOnlineMode(requestedMode) {
+  return !OFFLINE_MODE && requestedMode === "online";
 }
 
 /**
- * Load local Mistral model for offline inference
- * Uses mistral-src for local model execution
+ * Inspect local model assets for optional offline inference
+ * Real inference is delegated to the Python/Ollama path when available.
  */
 async function loadLocalModel() {
   try {
-    console.log("Loading local model...");
+    console.log("Inspecting local model assets...");
 
     // Check if model files exist
     const modelFiles = fs.readdirSync(LOCAL_MODEL_PATH);
     console.log(` Found model files: ${modelFiles.join(", ")}`);
-
-    // In a real implementation, this would load the actual model
-    // For this portable version, we'll use a mock that simulates local inference
-    // with the ethical constraints enforced
+    const runnableModelFile = modelFiles.find((file) =>
+      /\.(gguf|bin|onnx|safetensors)$/i.test(file),
+    );
+    if (!runnableModelFile) {
+      throw new Error("No runnable local model assets were found");
+    }
 
     localModel = {
-      name: "mistral-7b-local",
-      type: "offline",
-      path: LOCAL_MODEL_PATH,
-      loaded: true,
+      name: runnableModelFile,
+      type: "offline-assets",
+      path: path.join(LOCAL_MODEL_PATH, runnableModelFile),
+      loaded: false,
     };
 
-    modelLoaded = true;
-    console.log("Local model loaded successfully");
+    modelLoaded = false;
+    console.log(
+      "Local model assets detected. Use the Python/Ollama path for real local inference.",
+    );
   } catch (error) {
-    console.error("Failed to load local model:", error.message);
+    console.warn("No runnable local model assets detected:", error.message);
     console.log("Falling back to ethical local responses only");
     localModel = null;
     modelLoaded = false;
@@ -129,12 +172,9 @@ import {
   hasAIConsent,
   hasToolConsent,
   setUserConsent,
+  getConsentState,
   checkSherlockProtocol,
   requestSherlockConsent,
-  detectCrisis,
-  generateCrisisResponse,
-  detectSensitiveInput,
-  getSafeRedirection,
   formatHumanNLP,
   truncateForMirror,
 } from "./chatbot.js";
@@ -190,7 +230,7 @@ function offlineSherlockSearch(usernames) {
       "Offline Sherlock search completed. Results show usernames found in local database.",
     offline: true,
     disclaimer:
-      "This is an offline simulation. For real-time results, use the online version with Apify API.",
+      "This is a local demonstration dataset for safety-oriented checks.",
   };
 }
 
@@ -354,8 +394,8 @@ async function callPythonSafetyClassifier(text) {
  * @param {string} message - User message
  * @returns {Promise<string|null>} AI response text or null if unavailable
  */
-async function callPythonLocalLLM(message) {
-  if (!PYTHON_API_URL || !hasAIConsent()) return null;
+async function callPythonLocalLLM(message, sessionId = "default") {
+  if (!PYTHON_API_URL || !hasAIConsent(sessionId)) return null;
   try {
     const response = await fetch(`${PYTHON_API_URL}/llm/chat`, {
       method: "POST",
@@ -378,8 +418,8 @@ async function callPythonLocalLLM(message) {
  * @param {string} text - User input
  * @returns {Promise<Object|null>} NLP analysis result or null if unavailable
  */
-async function callPythonNLP(text) {
-  if (!PYTHON_API_URL || !hasAIConsent()) return null;
+async function callPythonNLP(text, sessionId = "default") {
+  if (!PYTHON_API_URL || !hasAIConsent(sessionId)) return null;
   try {
     const response = await fetch(`${PYTHON_API_URL}/nlp/analyze`, {
       method: "POST",
@@ -404,22 +444,25 @@ async function callPythonNLP(text) {
  */
 app.post("/api/chat", async (req, res) => {
   try {
-    const { message, consent, localPermissions } = req.body;
+    const { message, consent, localPermissions, mode } = req.body;
+    const sessionId = getSessionIdFromRequest(req);
+    const requestedMode = getRequestedMode(mode);
+    const onlineModeAllowed = shouldAllowOnlineMode(requestedMode);
 
     // Update consent if provided
     if (consent && typeof consent === "object") {
-      setUserConsent(consent.ai, consent.tools);
+      setUserConsent(consent.ai, consent.tools, sessionId);
     }
 
     if (localPermissions && typeof localPermissions === "object") {
-      setLocalPermissions(localPermissions);
+      setLocalPermissions(sessionId, localPermissions);
     }
 
     // Check for Sherlock command
     if (message && message.startsWith("/sherlock ")) {
       const username = message.substring(10).trim();
 
-      if (OFFLINE_MODE && !hasOfflineLocalPermission()) {
+      if (requestedMode === "offline" && !hasOfflineLocalPermission(sessionId)) {
         return res.json({
           response: formatResponseForDisplay(
             formatHumanNLP({
@@ -438,18 +481,25 @@ app.post("/api/chat", async (req, res) => {
       }
 
       // Check Sherlock protocol
-      const protocolCheck = checkSherlockProtocol(message);
+      const protocolCheck = checkSherlockProtocol(message, { sessionId });
 
-      if (!protocolCheck.allowed) {
-        const response = requestSherlockConsent(username);
+      if (!protocolCheck.allowed && protocolCheck.reason !== "EXPLICIT_CONSENT_REQUIRED") {
         return res.json({
-          response: formatResponseForDisplay(response),
-          requiresConsent: true,
-          consentType: "sherlock",
+          response: formatResponseForDisplay(
+            formatHumanNLP({
+              userInput: message,
+              anchor: "I need to ensure Sherlock is used appropriately.",
+              mirror: `You requested: "${message}"`,
+              reframe: protocolCheck.message,
+              rapport:
+                "Would you like to rephrase this as a safety check for your own username?",
+            }),
+          ),
+          requiresConsent: false,
         });
       }
 
-      if (!hasToolConsent()) {
+      if (!protocolCheck.allowed || !hasToolConsent(sessionId)) {
         const response = requestSherlockConsent(username);
         return res.json({
           response: formatResponseForDisplay(response),
@@ -521,7 +571,7 @@ app.post("/api/chat", async (req, res) => {
       (message.toLowerCase() === "yes" ||
         message.toLowerCase() === "/consent yes")
     ) {
-      setUserConsent(true, true);
+      setUserConsent(true, true, sessionId);
       const response = formatHumanNLP({
         userInput: message,
         anchor: "Thank you for your consent.",
@@ -534,7 +584,7 @@ app.post("/api/chat", async (req, res) => {
       return res.json({
         response: formatResponseForDisplay(response),
         consentGranted: true,
-        consent: userConsent,
+        consent: getConsentState(sessionId),
       });
     }
 
@@ -544,7 +594,7 @@ app.post("/api/chat", async (req, res) => {
       (message.toLowerCase() === "no" ||
         message.toLowerCase() === "/consent no")
     ) {
-      setUserConsent(false, false);
+      setUserConsent(false, false, sessionId);
       const response = formatHumanNLP({
         userInput: message,
         anchor: "Consent revoked.",
@@ -557,14 +607,15 @@ app.post("/api/chat", async (req, res) => {
       return res.json({
         response: formatResponseForDisplay(response),
         consentRevoked: true,
-        consent: userConsent,
+        consent: getConsentState(sessionId),
       });
     }
 
     // Process through ethical chatbot
     const response = chatbot.processMessage(message, {
       isSherlockRequest: false,
-      forceLocal: !hasAIConsent() || OFFLINE_MODE,
+      forceLocal: !hasAIConsent(sessionId),
+      sessionId,
     });
 
     // Enhanced safety check: use Python ML classifier when available,
@@ -593,9 +644,11 @@ app.post("/api/chat", async (req, res) => {
 
     // AI-assisted response: try Python local LLM first (fully on-device),
     // then fall back to external Mistral API, then to local ethical response.
-    if (hasAIConsent()) {
+    const pythonNlp = await callPythonNLP(message, sessionId);
+
+    if (hasAIConsent(sessionId)) {
       // 1. Python local LLM (Ollama — no external API, highest privacy)
-      const localLLMText = await callPythonLocalLLM(message);
+      const localLLMText = await callPythonLocalLLM(message, sessionId);
       if (localLLMText) {
         const localLLMResponse = buildOnlineResponse(message, localLLMText);
         return res.json({
@@ -603,11 +656,12 @@ app.post("/api/chat", async (req, res) => {
           offline: true,
           provider: "ollama",
           aiAssisted: true,
+          nlp: pythonNlp,
         });
       }
 
       // 2. External Mistral API (online mode only)
-      if (!OFFLINE_MODE && MISTRAL_API_KEY) {
+      if (onlineModeAllowed && MISTRAL_API_KEY) {
         try {
           const aiText = await callOnlineModel(message);
           const onlineResponse = buildOnlineResponse(message, aiText);
@@ -618,6 +672,7 @@ app.post("/api/chat", async (req, res) => {
             provider: "mistral",
             model: MISTRAL_MODEL,
             aiAssisted: true,
+            nlp: pythonNlp,
           });
         } catch (error) {
           console.warn(
@@ -628,36 +683,14 @@ app.post("/api/chat", async (req, res) => {
       }
     }
 
-    // If offline mode and no local model, use ethical local responses
-    if (OFFLINE_MODE && !modelLoaded) {
-      const displayResponse = formatResponseForDisplay(response);
-      return res.json({
-        response: displayResponse,
-        offline: true,
-        model: null,
-      });
-    }
-
-    // If we have a local model, simulate AI response with ethics
-    if (OFFLINE_MODE && modelLoaded && hasAIConsent()) {
-      // Simulate local model inference with ethical constraints
-      const ethicalResponse = createEthicalAIResponse(message);
-      const displayResponse = formatResponseForDisplay(ethicalResponse);
-
-      return res.json({
-        response: displayResponse,
-        offline: true,
-        model: localModel.name,
-        aiAssisted: true,
-      });
-    }
-
     // Default: ethical local response
     const displayResponse = formatResponseForDisplay(response);
     return res.json({
       response: displayResponse,
-      offline: OFFLINE_MODE,
-      online: !OFFLINE_MODE && Boolean(MISTRAL_API_KEY),
+      offline: !onlineModeAllowed,
+      online: onlineModeAllowed && Boolean(MISTRAL_API_KEY),
+      model: localModel?.name || null,
+      nlp: pythonNlp,
     });
   } catch (error) {
     console.error("Chat error:", error);
@@ -708,10 +741,11 @@ app.get("/api/python-status", async (req, res) => {
  * GET /moxie-checkin - Moxie gentle check-in endpoint
  */
 app.post("/api/local-permissions", (req, res) => {
+  const sessionId = getSessionIdFromRequest(req);
   const { allow, scope } = req.body || {};
   const granted = Boolean(allow);
 
-  setLocalPermissions({
+  const localPermissionState = setLocalPermissions(sessionId, {
     offline: granted,
     grantedAt: granted ? new Date().toISOString() : null,
     scope: scope || "offline",
@@ -774,8 +808,8 @@ app.get("/api/sherlock-info", (req, res) => {
     ],
     offline: OFFLINE_MODE,
     disclaimer: OFFLINE_MODE
-      ? "Offline mode uses local database. For real-time results, online mode with Apify API required."
-      : "Online mode uses Apify Sherlock Actor for real-time results.",
+      ? "Offline mode uses the local demonstration database only."
+      : "This server currently supports the local demonstration database only. The online path still keeps Sherlock limited to safety-oriented use.",
   });
 });
 
@@ -783,12 +817,14 @@ app.get("/api/sherlock-info", (req, res) => {
  * GET /consent-status - Get current consent status
  */
 app.get("/api/consent-status", (req, res) => {
+  const sessionId = getSessionIdFromRequest(req);
   res.json({
-    ai: hasAIConsent(),
-    tools: hasToolConsent(),
+    ai: hasAIConsent(sessionId),
+    tools: hasToolConsent(sessionId),
     offlineMode: OFFLINE_MODE,
     modelLoaded: modelLoaded,
     model: localModel,
+    localPermissions: getLocalPermissions(sessionId),
   });
 });
 
@@ -796,15 +832,13 @@ app.get("/api/consent-status", (req, res) => {
  * POST /consent - Set consent
  */
 app.post("/api/consent", (req, res) => {
+  const sessionId = getSessionIdFromRequest(req);
   const { ai, tools } = req.body;
-  setUserConsent(ai, tools);
+  setUserConsent(ai, tools, sessionId);
 
   res.json({
     success: true,
-    consent: {
-      ai: hasAIConsent(),
-      tools: hasToolConsent(),
-    },
+    consent: getConsentState(sessionId),
   });
 });
 
@@ -815,9 +849,12 @@ app.get("/api/health", (req, res) => {
   res.json({
     status: "ok",
     mode: OFFLINE_MODE ? "offline" : "online",
-    model: modelLoaded ? localModel.name : null,
+    model: localModel?.name || null,
+    modelLoaded: modelLoaded,
+    localInference: "python-ollama",
     onlineApiConfigured: Boolean(MISTRAL_API_KEY),
     onlineModel: MISTRAL_MODEL,
+    supportsRequestedOnlineMode: !OFFLINE_MODE,
     timestamp: new Date().toISOString(),
   });
 });
@@ -827,78 +864,6 @@ app.get("/api/health", (req, res) => {
  */
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
-});
-
-/**
- * GET /moxie.css - Serve Moxie-specific styles
- */
-app.get("/moxie.css", (req, res) => {
-  const css = `
-    /* Moxie - Cyan/Pink/Black Neon Paperclip Companion */
-    #moxie-paperclip {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      width: 60px;
-      height: 60px;
-      background: linear-gradient(135deg, #ff2d95, #ff70d3, #7d2cff);
-      border-radius: 18px;
-      clip-path: polygon(0% 0%, 100% 0%, 100% 70%, 70% 70%, 70% 100%, 30% 100%, 30% 70%, 0% 70%);
-      z-index: 1000;
-      cursor: pointer;
-      box-shadow: 0 15px 40px rgba(0,0,0,.2);
-      transition: transform 0.3s ease, box-shadow 0.3s ease;
-    }
-    
-    #moxie-paperclip:hover {
-      transform: scale(1.1) rotate(15deg);
-      box-shadow: 0 20px 50px rgba(255, 45, 149, 0.4);
-    }
-    
-    #moxie-paperclip:active {
-      transform: scale(0.95) rotate(-5deg);
-    }
-    
-    #moxie-paperclip::before {
-      content: '';
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      font-size: 24px;
-      color: white;
-      text-shadow: 0 2px 4px rgba(0,0,0,0.3);
-    }
-    
-    .moxie-message {
-      background: linear-gradient(135deg, #ff2d9520, #7d2cff20);
-      border-left: 3px solid #ff2d95;
-      padding: 10px 15px;
-      margin: 10px 0;
-      border-radius: 8px;
-      font-style: italic;
-      color: #7d2cff;
-    }
-    
-    .moxie-checkin {
-      animation: pulse 2s infinite;
-    }
-    
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.7; }
-    }
-  `;
-
-  res.type("text/css").send(css);
-});
-
-/**
- * GET /riot-grrrl.css - Serve Riot Grrrl palette
- */
-app.get("/riot-grrrl.css", (req, res) => {
-  const css = fs.readFileSync(path.join(__dirname, "riot-grrrl.css"), "utf8");
-  res.type("text/css").send(css);
 });
 
 /**
