@@ -7,7 +7,7 @@ A trauma-informed, privacy-first chat experience built for calm, local use. The 
 - A local web server in [server-offline.js](server-offline.js)
 - Ethical response formatting and consent checks in [chatbot.js](chatbot.js)
 - A simple chat UI with a help popup, dark/light mode, and clear input flow in [index.html](index.html)
-- A Moxie desktop companion with check-ins and a floating widget in [index.html](index.html) and [moxie.css](moxie.css)
+- A Moxie desktop companion with check-ins and a floating widget in [index.html](index.html) and [public/moxie.css](public/moxie.css)
 - Optional online AI support through a Mistral-compatible API when environment variables are configured
 - Optional Python microservice in [python/](python/) for enhanced NLP, local LLM inference, and voice processing
 
