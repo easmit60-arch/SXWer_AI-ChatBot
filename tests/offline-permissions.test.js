@@ -55,3 +55,9 @@ test("granting AI consent does not auto-resend the prior message", () => {
   assert.doesNotMatch(indexHtml, /sendMessage\(lastUserMessage\)/i);
   assert.match(indexHtml, /AI consent granted\. Send a message when you're ready\./i);
 });
+
+test("chat UI includes a browser fallback when the API returns HTTP 405", () => {
+  assert.match(indexHtml, /window\.__sxwerLocalAssistant\s*=/i);
+  assert.match(indexHtml, /buildBrowserFallbackData\(messageText,\s*`HTTP \$\{response\.status\}`\)/i);
+  assert.match(indexHtml, /Browser fallback active - Local responses only/i);
+});
