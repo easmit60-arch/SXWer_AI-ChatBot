@@ -1320,6 +1320,10 @@ app.post("/api/chat", validateChatInput, csrfProtection, requireAuth, async (req
         provider: "local-curated",
         model: localModel?.name || null,
         mode: "offline",
+        extra: {
+          offline: !onlineApiActive,
+          online: onlineApiActive,
+        },
       }),
       nlp: pythonNlp,
     });
