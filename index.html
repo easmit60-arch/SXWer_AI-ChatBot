@@ -882,7 +882,7 @@
       </div>
 
       <div class="chat-area">
-        <div id="messages" class="messages">
+        <div id="messages" class="messages" aria-live="polite">
           <div class="message assistant">
             <div class="message-content">
               Hello. I'm here to listen without judgment. This is your space.
@@ -930,7 +930,7 @@
           </p>
         </div>
 
-        <div id="status" class="status"></div>
+        <div id="status" class="status" role="status" aria-live="polite"></div>
       </div>
     </div>
 
@@ -956,6 +956,8 @@
       class="help-popup hidden"
       role="dialog"
       aria-label="Quick help"
+      aria-modal="true"
+      tabindex="-1"
     >
       <h3>Quick guide</h3>
       <p>Use this chat in simple steps:</p>
@@ -984,6 +986,7 @@
       class="moxie-widget hidden"
       role="dialog"
       aria-label="Moxie companion widget"
+      tabindex="-1"
     >
       <div class="moxie-widget-header">
         <span class="moxie-widget-title">Moxie Companion</span>
@@ -1014,7 +1017,7 @@
     </div>
 
     <!-- Command Help Overlay -->
-    <div id="command-help" class="command-help hidden">
+    <div id="command-help" class="command-help hidden" role="dialog" aria-modal="true" tabindex="-1">
       <h3>Available Commands</h3>
       <ul>
         <li>
@@ -1028,13 +1031,7 @@
         <li><code>/consent no</code> - Revoke AI consent</li>
         <li><code>/help</code> - Show this help</li>
       </ul>
-      <button
-        onclick="
-          document.getElementById('command-help').classList.add('hidden')
-        "
-      >
-        Close
-      </button>
+      <button id="command-help-close" type="button">Close</button>
     </div>
 
     <!-- Mistral Data Disclosure Modal — shown before switching to online mode -->
@@ -1044,6 +1041,7 @@
       role="dialog"
       aria-modal="true"
       aria-labelledby="mistral-disclosure-title"
+      tabindex="-1"
     >
       <div class="disclosure-modal">
         <h3 id="mistral-disclosure-title">Before enabling online AI — what this means</h3>
@@ -1117,8 +1115,11 @@
       let consent = { ai: false, tools: false };
       let localPermissions = { offline: false, grantedAt: null };
       let moxieCheckInInterval = null;
+      let pendingSherlockUsername = "";
       // Stores the online AI model name received from /api/health
       let onlineModelName = "mistral-small-latest";
+      const SESSION_STORAGE_KEY = "sxwer_session_id";
+      const sessionId = getOrCreateSessionId();
 
       // Moxie Configuration
       const MOXIE_CONFIG = {
@@ -1140,6 +1141,20 @@
           "I'm here to listen without judgment. What's on your mind?",
         ],
       };
+
+      function getOrCreateSessionId() {
+        const existing = localStorage.getItem(SESSION_STORAGE_KEY);
+        if (existing) {
+          return existing;
+        }
+
+        const generated =
+          typeof crypto !== "undefined" && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `sxwer-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        localStorage.setItem(SESSION_STORAGE_KEY, generated);
+        return generated;
+      }
 
       // Initialize
       function init() {
@@ -1166,7 +1181,9 @@
         }
 
         // Check if offline mode
-        fetch("/api/health")
+        fetch(`/api/health?sessionId=${encodeURIComponent(sessionId)}`, {
+          headers: { "x-session-id": sessionId },
+        })
           .then((res) => res.json())
           .then((data) => {
             if (data.onlineModel) {
@@ -1198,10 +1215,12 @@
           mistralDisclosureOverlay.classList.add("hidden");
           setOnlineToggleState(true);
           showOfflineBanner("Online mode enabled. AI requires separate consent.");
+          offlineToggle.focus();
         });
         mistralDisclosureDecline.addEventListener("click", () => {
           mistralDisclosureOverlay.classList.add("hidden");
           // Leave toggle in its current (offline) state — user cancelled
+          offlineToggle.focus();
         });
 
         darkModeToggle.addEventListener("click", () => {
@@ -1255,11 +1274,35 @@
         helpButton.addEventListener("click", (event) => {
           event.stopPropagation();
           helpPopup.classList.toggle("hidden");
+          if (!helpPopup.classList.contains("hidden")) {
+            helpPopup.focus();
+          }
         });
 
         helpPopupClose.addEventListener("click", (event) => {
           event.stopPropagation();
           helpPopup.classList.add("hidden");
+          helpButton.focus();
+        });
+
+        document.addEventListener("keydown", (event) => {
+          if (event.key !== "Escape") return;
+          if (!mistralDisclosureOverlay.classList.contains("hidden")) {
+            mistralDisclosureOverlay.classList.add("hidden");
+            offlineToggle.focus();
+          }
+          if (!commandHelp.classList.contains("hidden")) {
+            commandHelp.classList.add("hidden");
+            chatInput.focus();
+          }
+          if (!helpPopup.classList.contains("hidden")) {
+            helpPopup.classList.add("hidden");
+            helpButton.focus();
+          }
+          if (!moxieWidget.classList.contains("hidden")) {
+            closeMoxieWidget();
+            moxieElement.focus();
+          }
         });
 
       }
@@ -1299,39 +1342,66 @@
 
       function showLocalPermissionDialog(scope = "offline") {
         const dialog = document.createElement("div");
-        dialog.className = "consent-banner";
+        dialog.className = "consent-banner local-permission-dialog";
         dialog.innerHTML = `
           <p><strong>Offline local access needs your permission.</strong></p>
           <p>This app can use local-only data for your safety checks when you are offline.</p>
           <p>It does not access unrelated device files or personal contacts by default.</p>
           <p>Do you want to allow local-only access for this session?</p>
-          <button onclick="grantLocalPermissions('${scope}')">Allow local-only access</button>
-          <button onclick="denyLocalPermissions()">No, keep private</button>
+          <button type="button" data-action="allow-local">Allow local-only access</button>
+          <button type="button" data-action="deny-local">No, keep private</button>
         `;
+        dialog
+          .querySelector('[data-action="allow-local"]')
+          .addEventListener("click", () => grantLocalPermissions(scope, dialog));
+        dialog
+          .querySelector('[data-action="deny-local"]')
+          .addEventListener("click", () => denyLocalPermissions(dialog));
         document.querySelector(".input-area").prepend(dialog);
+        dialog.querySelector("button")?.focus();
       }
 
-      function grantLocalPermissions(scope = "offline") {
+      async function syncLocalPermissions(allow, scope = "offline") {
+        try {
+          await fetch("/api/local-permissions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ allow, scope, sessionId }),
+          });
+        } catch (error) {
+          console.warn("Failed to sync local permissions:", error);
+        }
+      }
+
+      function grantLocalPermissions(scope = "offline", dialog = null) {
         localPermissions = {
           offline: true,
           grantedAt: new Date().toISOString(),
           scope,
         };
         saveLocalPermissions();
-        document.querySelector(".consent-banner")?.remove();
+        syncLocalPermissions(true, scope);
+        dialog?.remove();
         if (scope === "offline") {
           setStatus("Offline local access enabled.");
         }
+        if (pendingSherlockUsername && consent.tools) {
+          const pendingUsername = pendingSherlockUsername;
+          pendingSherlockUsername = "";
+          sherlockInput.value = "";
+          sendMessage(`/sherlock ${pendingUsername}`);
+        }
       }
 
-      function denyLocalPermissions() {
+      function denyLocalPermissions(dialog = null) {
         localPermissions = {
           offline: false,
           grantedAt: null,
           scope: "offline",
         };
         saveLocalPermissions();
-        document.querySelector(".consent-banner")?.remove();
+        syncLocalPermissions(false, "offline");
+        dialog?.remove();
         setStatus("Offline local access kept private.");
       }
 
@@ -1340,6 +1410,7 @@
           moxieWidget.classList.remove("hidden");
           helpPopup.classList.add("hidden");
           commandHelp.classList.add("hidden");
+          moxieWidget.focus();
         }
       }
 
@@ -1384,15 +1455,18 @@
 
       // Show offline banner
       function showOfflineBanner(
-        message = "Offline mode: using local model. No API keys or network required.",
+        message = "Offline mode: local-only responses stay on this device unless you switch to online mode.",
       ) {
         const banner = document.createElement("div");
         banner.className = "info-banner";
         const safeMessage = String(message).replace(/</g, "&lt;").replace(/>/g, "&gt;");
         banner.innerHTML = `
           <span><strong>Status:</strong> ${safeMessage}</span>
-          <button onclick="this.parentElement.remove()">Dismiss</button>
+          <button type="button">Dismiss</button>
         `;
+        banner.querySelector("button")?.addEventListener("click", () => {
+          banner.remove();
+        });
         document.querySelector(".input-area").prepend(banner);
       }
 
@@ -1402,9 +1476,12 @@
         banner.className = "info-banner";
         const safeModelName = String(modelName).replace(/</g, "&lt;").replace(/>/g, "&gt;");
         banner.innerHTML = `
-          <span> <strong>Model:</strong> ${safeModelName} loaded successfully.</span>
-          <button onclick="this.parentElement.remove()">Dismiss</button>
+          <span> <strong>Model asset:</strong> ${safeModelName} detected for optional local inference.</span>
+          <button type="button">Dismiss</button>
         `;
+        banner.querySelector("button")?.addEventListener("click", () => {
+          banner.remove();
+        });
         document.querySelector(".input-area").prepend(banner);
       }
 
@@ -1476,11 +1553,16 @@
         try {
           const response = await fetch("/api/chat", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "x-session-id": sessionId,
+            },
             body: JSON.stringify({
               message: messageText,
               consent: consent,
               localPermissions: localPermissions,
+              sessionId,
+              mode: isOfflineMode() ? "offline" : "online",
             }),
           });
 
@@ -1503,18 +1585,10 @@
             showLocalPermissionDialog(data.localPermissionScope || "offline");
           }
 
-          // Handle Sherlock results
-          if (data.results) {
-            // Server already formatted the response with ethical structure
-            // Just display it normally
-            appendMessage("assistant", data.response);
-          } else {
-            appendMessage("assistant", data.response);
-          }
-
-          // Handle Moxie response
           if (data.from === "Moxie") {
             appendMessage("moxie", data.response);
+          } else {
+            appendMessage("assistant", data.response);
           }
 
           // Handle consent request
@@ -1522,7 +1596,11 @@
             showConsentDialog(data.consentType);
           }
 
-          setStatus(data.offline ? "Offline mode - Local responses only" : "");
+          setStatus(
+            data.offline
+              ? "Offline mode - Local responses only"
+              : "Online mode enabled",
+          );
         } catch (error) {
           loadingMsg.remove();
           // Format error with ethical structure
@@ -1552,8 +1630,7 @@
           .map((u) => u.trim())
           .filter((u) => u)[0];
         if (!username) return;
-
-        sherlockInput.value = "";
+        pendingSherlockUsername = username;
 
         // Check if user has given tool consent
         if (!consent.tools) {
@@ -1566,6 +1643,8 @@
           return;
         }
 
+        sherlockInput.value = "";
+        pendingSherlockUsername = "";
         // Send as command
         sendMessage(`/sherlock ${username}`);
       }
@@ -1576,21 +1655,19 @@
         dialog.className = "consent-banner";
 
         if (type === "sherlock") {
-          // Build the Apify disclosure line conditionally based on online mode
-          const isOnline = !isOfflineMode();
-          const apifyNotice = isOnline
-            ? `<p><strong>Third-party notice (online mode):</strong> When online mode is active, username searches are processed by <strong>Apify</strong> (apify.com), a third-party data service. Apify receives the username you search for and returns publicly available profile data. Apify's privacy policy applies to that data.</p>`
-            : `<p>You are in <strong>offline mode</strong>. Searches use a local demonstration database only — no username leaves your device.</p>`;
+          const modeNotice = isOfflineMode()
+            ? `<p>You are in <strong>offline mode</strong>. Searches use a local demonstration database only — no username leaves your device.</p>`
+            : `<p>You are in <strong>online mode</strong>, but Sherlock still stays in the app's local demonstration flow for safety-focused username checks.</p>`;
 
           dialog.innerHTML = `
             <p><strong>Sherlock requires your explicit consent.</strong></p>
             <p>This tool searches public social media profiles for safety/verification only.</p>
             <p>Never for surveillance of others without their knowledge.</p>
-            ${apifyNotice}
+            ${modeNotice}
             <p>No personal data is stored by this app. Results are for your use only.</p>
             <p>Do you consent to using Sherlock?</p>
-            <button onclick="grantSherlockConsent()">Yes, I consent</button>
-            <button onclick="this.parentElement.remove()">No, cancel</button>
+            <button type="button" data-action="grant-consent">Yes, I consent</button>
+            <button type="button" data-action="dismiss-consent">No, cancel</button>
           `;
         } else {
           dialog.innerHTML = `
@@ -1599,31 +1676,49 @@
             <p>With consent, I can use AI to provide more tailored responses.</p>
             <p>You can revoke consent at any time.</p>
             <p>Do you consent to AI assistance?</p>
-            <button onclick="grantAIConsent()">Yes, I consent</button>
-            <button onclick="this.parentElement.remove()">No, cancel</button>
+            <button type="button" data-action="grant-consent">Yes, I consent</button>
+            <button type="button" data-action="dismiss-consent">No, cancel</button>
           `;
         }
 
+        dialog
+          .querySelector('[data-action="grant-consent"]')
+          ?.addEventListener("click", () => {
+            if (type === "sherlock") {
+              grantSherlockConsent(dialog);
+            } else {
+              grantAIConsent(dialog);
+            }
+          });
+        dialog
+          .querySelector('[data-action="dismiss-consent"]')
+          ?.addEventListener("click", () => dialog.remove());
         document.querySelector(".input-area").prepend(dialog);
+        dialog.querySelector("button")?.focus();
       }
 
       // Grant Sherlock consent
-      function grantSherlockConsent() {
+      function grantSherlockConsent(dialog = null) {
         consent.tools = true;
         localStorage.setItem("sxwer_consent", JSON.stringify(consent));
-        document.querySelector(".consent-banner").remove();
-        // Re-send the last Sherlock request
-        const lastSherlock = sherlockInput.value.trim();
-        if (lastSherlock) {
-          runSherlock();
+        dialog?.remove();
+        if (pendingSherlockUsername) {
+          if (isOfflineMode() && !localPermissions.offline) {
+            showLocalPermissionDialog("offline");
+            return;
+          }
+          const username = pendingSherlockUsername;
+          pendingSherlockUsername = "";
+          sherlockInput.value = "";
+          sendMessage(`/sherlock ${username}`);
         }
       }
 
       // Grant AI consent
-      function grantAIConsent() {
+      function grantAIConsent(dialog = null) {
         consent.ai = true;
         localStorage.setItem("sxwer_consent", JSON.stringify(consent));
-        document.querySelector(".consent-banner").remove();
+        dialog?.remove();
         // Re-send the last message
         const lastUserMessage = Array.from(
           document.querySelectorAll(".message.user .message-content"),
@@ -1636,13 +1731,14 @@
       // Event Listeners
       sendBtn.addEventListener("click", () => sendMessage());
 
-      const closeCommandHelpButton = document.querySelector(
-        "#command-help button",
+      const closeCommandHelpButton = document.getElementById(
+        "command-help-close",
       );
       if (closeCommandHelpButton) {
         closeCommandHelpButton.addEventListener("click", (event) => {
           event.stopPropagation();
           commandHelp.classList.add("hidden");
+          chatInput.focus();
         });
       }
 
@@ -1655,6 +1751,7 @@
         // Show command help on /
         if (e.key === "/" && chatInput.value === "/") {
           commandHelp.classList.remove("hidden");
+          commandHelp.focus();
         }
       });
 
@@ -1697,8 +1794,5 @@
       // Initialize on load
       window.addEventListener("load", init);
     </script>
-
-    <!-- Load additional styles -->
-    <link rel="stylesheet" href="riot-grrrl.css" />
   </body>
 </html>

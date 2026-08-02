@@ -21,6 +21,9 @@ from typing import Optional
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from local_llm import generate_local_response, get_ollama_status
 from nlp_service import analyze_intent, detect_sentiment

@@ -8,6 +8,7 @@
     "start": "node server-offline.js",
     "start:usb": "OFFLINE_MODE=true node server-offline.js",
     "dev": "nodemon server-offline.js",
+    "test": "node --test",
     "bundle": "npm install --production && npm prune --production",
     "bundle:usb": "npm run bundle && echo 'Copy entire directory to USB drive'"
   },
@@ -23,6 +24,7 @@
   "author": "SXWers",
   "license": "MIT",
   "dependencies": {
+    "dotenv": "^17.4.2",
     "express": "^4.21.2"
   },
   "devDependencies": {
