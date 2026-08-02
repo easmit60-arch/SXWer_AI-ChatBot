@@ -41,7 +41,7 @@ const PORT = process.env.PORT || 3000;
 // ============================================================================
 
 // Helmet for security headers
-app.use(helmet());
+app.use(helmet({ contentSecurityPolicy: false }));
 
 // CORS configuration - restrict to localhost origins for development
 const corsOptions = {
