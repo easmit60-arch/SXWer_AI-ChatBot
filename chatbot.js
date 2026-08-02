@@ -116,9 +116,13 @@ const DEFAULT_CONSENT = Object.freeze({
 });
 
 const consentStore = new Map();
+const SESSION_ID_PATTERN = /^[a-zA-Z0-9_-]{1,64}$/;
 
 function normalizeSessionId(sessionId = "default") {
   const normalized = String(sessionId || "default").trim();
+  if (!SESSION_ID_PATTERN.test(normalized)) {
+    return "default";
+  }
   return normalized || "default";
 }
 
