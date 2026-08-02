@@ -33,6 +33,12 @@ import {
 } from "./chatbot.js";
 
 import resources from "./resources.json" with { type: "json" };
+import { getGovernanceFlagSnapshot } from "./governance/aiConstitution.js";
+import { applyGovernanceToResponse } from "./middleware/governanceMiddleware.js";
+import { requireConsentForFeature } from "./permissions/ConsentGuard.js";
+import { verifyResourceCollection } from "./ethics/resourceVerifier.js";
+
+const GOVERNANCE_FLAGS = getGovernanceFlagSnapshot();
 
 // ============================================================================
 // CONSTANTS
@@ -88,7 +94,9 @@ function getRequestedMode(mode = "offline") {
 async function callOnlineModel(message, env) {
   const apiKey = env.MISTRAL_API_KEY || "";
   if (!apiKey) {
-    throw new Error("Online API is not configured — MISTRAL_API_KEY is missing");
+    throw new Error(
+      "Online API is not configured — MISTRAL_API_KEY is missing",
+    );
   }
 
   const apiBase =
@@ -160,6 +168,44 @@ function buildOnlineResponse(message, aiText) {
   });
 }
 
+function buildGovernedPayload({
+  response,
+  aiUsed = false,
+  provider = "local-curated",
+  model = "unknown",
+  mode = "offline",
+  consentState = "not-set",
+  extra = {},
+} = {}) {
+  const governed = applyGovernanceToResponse({
+    responseText: formatResponseForDisplay(response),
+    aiUsed,
+    provider,
+    model,
+    mode,
+    confidence: aiUsed ? "medium" : "high",
+    limitations: aiUsed
+      ? ["AI output can still be imperfect."]
+      : ["Local rule-based responses may be less tailored."],
+    externalRequests:
+      aiUsed && mode === "online"
+        ? ["Configured online AI provider"]
+        : ["None"],
+    resourcesConsulted: ["Local safety policy", "Human rights rules"],
+    consentState,
+    stored: "Current-session metadata only",
+    shared: aiUsed && mode === "online" ? "Provider request only" : "No",
+    safetyFilters: ["Consent Guard", "Human Rights Review"],
+  });
+
+  return {
+    response: governed.responseText,
+    disclosure: governed.disclosure,
+    humanRightsReview: governed.humanRightsReview,
+    ...extra,
+  };
+}
+
 // ============================================================================
 // ROUTE HANDLERS
 // ============================================================================
@@ -197,8 +243,7 @@ async function handleChat(request, env) {
             userInput: "",
             anchor: "I need a valid message to respond.",
             mirror: "You provided an empty or invalid message.",
-            reframe:
-              "Please type something in the chat box and try again.",
+            reframe: "Please type something in the chat box and try again.",
             rapport: "What would you like to talk about?",
           }),
         ),
@@ -210,10 +255,45 @@ async function handleChat(request, env) {
   try {
     // /sherlock command
     if (message.startsWith("/sherlock ")) {
+      const sherlockConsent = requireConsentForFeature({
+        feature: "sherlock",
+        sessionId,
+        consentState: {
+          scopes: {
+            sherlock: hasToolConsent(sessionId),
+          },
+        },
+      });
+      if (!sherlockConsent.allowed) {
+        const blocked = formatHumanNLP({
+          userInput: message,
+          anchor: "Sherlock is blocked until consent checks pass.",
+          mirror: `You requested: "${message}"`,
+          reframe: sherlockConsent.reason,
+          rapport: "You can continue local chat support without Sherlock.",
+        });
+        return jsonResponse(
+          buildGovernedPayload({
+            response: blocked,
+            aiUsed: false,
+            provider: "local-curated",
+            mode: "offline",
+            consentState: "not-set",
+            extra: {
+              requiresConsent: true,
+              consentType: "sherlock",
+            },
+          }),
+        );
+      }
+
       const username = message.substring(10).trim();
       const protocolCheck = checkSherlockProtocol(message, { sessionId });
 
-      if (!protocolCheck.allowed && protocolCheck.reason !== "EXPLICIT_CONSENT_REQUIRED") {
+      if (
+        !protocolCheck.allowed &&
+        protocolCheck.reason !== "EXPLICIT_CONSENT_REQUIRED"
+      ) {
         return jsonResponse({
           response: formatResponseForDisplay(
             formatHumanNLP({
@@ -249,14 +329,23 @@ async function handleChat(request, env) {
           "Would you like help with something else, or a list of support resources?",
       });
 
-      return jsonResponse({
-        response: formatResponseForDisplay(sherockUnavailable),
-        offline: false,
-      });
+      return jsonResponse(
+        buildGovernedPayload({
+          response: sherockUnavailable,
+          aiUsed: false,
+          provider: "local-curated",
+          mode: "offline",
+          consentState: "granted",
+          extra: { offline: false },
+        }),
+      );
     }
 
     // /resources and /help
     if (message === "/resources" || message === "/help") {
+      const verifiedResources = verifyResourceCollection(
+        resources.organizations || [],
+      );
       const response = formatHumanNLP({
         userInput: message,
         anchor: "Here are resources and support organizations for sex workers:",
@@ -268,12 +357,24 @@ async function handleChat(request, env) {
           "/consent no to use local responses only, or /resources to see this list again.",
       });
 
-      return jsonResponse({
-        response: formatResponseForDisplay(response),
-        resources: resources.organizations,
-        crisis_resources: resources.crisis_resources,
-        safety_tips: resources.safety_tips,
-      });
+      return jsonResponse(
+        buildGovernedPayload({
+          response,
+          aiUsed: false,
+          provider: "local-curated",
+          mode: "offline",
+          consentState: "granted",
+          extra: {
+            resources: verifiedResources.verified,
+            resourceVerification: {
+              verifiedCount: verifiedResources.verified.length,
+              rejectedCount: verifiedResources.rejected.length,
+            },
+            crisis_resources: resources.crisis_resources,
+            safety_tips: resources.safety_tips,
+          },
+        }),
+      );
     }
 
     // /moxie command
@@ -288,10 +389,16 @@ async function handleChat(request, env) {
         rapport: "Would you like Moxie to check in more often?",
       });
 
-      return jsonResponse({
-        response: formatResponseForDisplay(response),
-        from: "Moxie",
-      });
+      return jsonResponse(
+        buildGovernedPayload({
+          response,
+          aiUsed: false,
+          provider: "local-curated",
+          mode: "offline",
+          consentState: "granted",
+          extra: { from: "Moxie" },
+        }),
+      );
     }
 
     // /consent yes
@@ -310,11 +417,19 @@ async function handleChat(request, env) {
         rapport: "What would you like to talk about?",
       });
 
-      return jsonResponse({
-        response: formatResponseForDisplay(response),
-        consentGranted: true,
-        consent: getConsentState(sessionId),
-      });
+      return jsonResponse(
+        buildGovernedPayload({
+          response,
+          aiUsed: false,
+          provider: "local-curated",
+          mode: "offline",
+          consentState: "granted",
+          extra: {
+            consentGranted: true,
+            consent: getConsentState(sessionId),
+          },
+        }),
+      );
     }
 
     // /consent no
@@ -332,11 +447,19 @@ async function handleChat(request, env) {
         rapport: "How can I assist you with local knowledge?",
       });
 
-      return jsonResponse({
-        response: formatResponseForDisplay(response),
-        consentRevoked: true,
-        consent: getConsentState(sessionId),
-      });
+      return jsonResponse(
+        buildGovernedPayload({
+          response,
+          aiUsed: false,
+          provider: "local-curated",
+          mode: "offline",
+          consentState: "revoked",
+          extra: {
+            consentRevoked: true,
+            consent: getConsentState(sessionId),
+          },
+        }),
+      );
     }
 
     // General message — process through ethical chatbot
@@ -356,14 +479,23 @@ async function handleChat(request, env) {
       try {
         const aiText = await callOnlineModel(message, env);
         const onlineResponse = buildOnlineResponse(message, aiText);
-        return jsonResponse({
-          response: formatResponseForDisplay(onlineResponse),
-          offline: false,
-          online: true,
-          provider: "mistral",
-          model: env.MISTRAL_MODEL || "mistral-small-latest",
-          aiAssisted: true,
-        });
+        return jsonResponse(
+          buildGovernedPayload({
+            response: onlineResponse,
+            aiUsed: true,
+            provider: "mistral",
+            model: env.MISTRAL_MODEL || "mistral-small-latest",
+            mode: "online",
+            consentState: hasAIConsent(sessionId) ? "granted" : "revoked",
+            extra: {
+              offline: false,
+              online: true,
+              provider: "mistral",
+              model: env.MISTRAL_MODEL || "mistral-small-latest",
+              aiAssisted: true,
+            },
+          }),
+        );
       } catch (err) {
         // Fail gracefully: log and fall back to local response
         console.warn(
@@ -373,19 +505,26 @@ async function handleChat(request, env) {
       }
     }
 
-    return jsonResponse({
-      response: formatResponseForDisplay(localResponse),
-      offline: requestedMode !== "online",
-      online: requestedMode === "online" && Boolean(env.MISTRAL_API_KEY),
-    });
+    return jsonResponse(
+      buildGovernedPayload({
+        response: localResponse,
+        aiUsed: false,
+        provider: "local-curated",
+        mode: requestedMode === "online" ? "online" : "offline",
+        consentState: hasAIConsent(sessionId) ? "granted" : "revoked",
+        extra: {
+          offline: requestedMode !== "online",
+          online: requestedMode === "online" && Boolean(env.MISTRAL_API_KEY),
+        },
+      }),
+    );
   } catch (error) {
     console.error("[WORKER] Chat error:", error);
     const errResponse = formatHumanNLP({
       userInput: message,
       anchor: "I encountered an error processing your request.",
       mirror: `You requested: "${truncateForMirror(message)}"`,
-      reframe:
-        "This might be a temporary issue. Please try again in a moment.",
+      reframe: "This might be a temporary issue. Please try again in a moment.",
       rapport: "Would you like to try again or use a different approach?",
     });
 
@@ -404,6 +543,7 @@ function handleHealth(env) {
     model: null,
     onlineApiConfigured: Boolean(env.MISTRAL_API_KEY),
     onlineModel: env.MISTRAL_MODEL || "mistral-small-latest",
+    governanceFlags: GOVERNANCE_FLAGS,
     timestamp: new Date().toISOString(),
   });
 }

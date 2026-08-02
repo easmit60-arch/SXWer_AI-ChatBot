@@ -1,6 +1,7 @@
 const PAGE_CONFIG = {
   "privacy-dashboard": "Privacy Dashboard",
   "consent-dashboard": "Consent Dashboard",
+  "data-dashboard": "Data Dashboard",
   "data-manager": "Data Manager",
   "export-center": "Export Center",
   "delete-my-data": "Delete My Data",
@@ -30,7 +31,8 @@ function escapeHtml(value) {
 async function ensureSession() {
   if (sessionContext) return sessionContext;
   const response = await fetch("/api/session", { credentials: "include" });
-  if (!response.ok) throw new Error(`Session bootstrap failed: ${response.status}`);
+  if (!response.ok)
+    throw new Error(`Session bootstrap failed: ${response.status}`);
   sessionContext = await response.json();
   return sessionContext;
 }
@@ -50,7 +52,10 @@ async function apiFetch(url, options = {}) {
 function renderNav() {
   const nav = document.getElementById("dashboard-nav");
   nav.innerHTML = `<ul>${Object.entries(PAGE_CONFIG)
-    .map(([slug, title]) => `<li><a href="/${slug}" ${slug === pageKey ? 'aria-current="page"' : ""}>${escapeHtml(title)}</a></li>`)
+    .map(
+      ([slug, title]) =>
+        `<li><a href="/${slug}" ${slug === pageKey ? 'aria-current="page"' : ""}>${escapeHtml(title)}</a></li>`,
+    )
     .join("")}</ul>`;
 }
 
@@ -72,25 +77,39 @@ function renderCategory(category) {
 }
 
 function renderReport(report) {
-  const consentScopes = Object.entries(report.consentDashboard.current.scopes || {})
-    .map(([scope, enabled]) => `<tr><td>${escapeHtml(scope)}</td><td>${enabled ? "Enabled" : "Off"}</td></tr>`)
+  const consentScopes = Object.entries(
+    report.consentDashboard.current.scopes || {},
+  )
+    .map(
+      ([scope, enabled]) =>
+        `<tr><td>${escapeHtml(scope)}</td><td>${enabled ? "Enabled" : "Off"}</td></tr>`,
+    )
     .join("");
 
-  const auditRows = (report.auditTimeline || [])
-    .map((event) => `<tr><td>${escapeHtml(event.timestamp)}</td><td>${escapeHtml(event.eventType)}</td><td>${escapeHtml(event.summary)}</td></tr>`)
-    .join("") || '<tr><td colspan="3">No audit events yet.</td></tr>';
+  const auditRows =
+    (report.auditTimeline || [])
+      .map(
+        (event) =>
+          `<tr><td>${escapeHtml(event.timestamp)}</td><td>${escapeHtml(event.eventType)}</td><td>${escapeHtml(event.summary)}</td></tr>`,
+      )
+      .join("") || '<tr><td colspan="3">No audit events yet.</td></tr>';
 
-  const rightsRows = Object.entries(report.latestTransparency?.rights || {
-    understand: true,
-    consent: true,
-    refuse: true,
-    revoke: true,
-    inspect: true,
-    export: true,
-    delete: true,
-    continueWithoutAI: true,
-  })
-    .map(([key, value]) => `<tr><td>${escapeHtml(key)}</td><td>${value ? "Yes" : "No"}</td></tr>`)
+  const rightsRows = Object.entries(
+    report.latestTransparency?.rights || {
+      understand: true,
+      consent: true,
+      refuse: true,
+      revoke: true,
+      inspect: true,
+      export: true,
+      delete: true,
+      continueWithoutAI: true,
+    },
+  )
+    .map(
+      ([key, value]) =>
+        `<tr><td>${escapeHtml(key)}</td><td>${value ? "Yes" : "No"}</td></tr>`,
+    )
     .join("");
 
   const disclosure = report.latestTransparency?.disclosure;
@@ -138,6 +157,39 @@ function renderReport(report) {
     <section class="card">
       <h3>Data Manager</h3>
       <div class="grid">${report.dataManager.categories.map(renderCategory).join("")}</div>
+    </section>
+
+    <section class="card">
+      <h3>Data Storage Matrix</h3>
+      <p>Each category includes inspect, export, and delete actions.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th>Current State</th>
+              <th>Inspect</th>
+              <th>Export</th>
+              <th>Delete</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${report.dataManager.categories
+              .map(
+                (category) => `
+              <tr>
+                <td>${escapeHtml(category.title)}</td>
+                <td>${escapeHtml(category.currentState)}</td>
+                <td><button type="button" class="secondary" data-action="inspect" data-category="${escapeHtml(category.id)}">Inspect</button></td>
+                <td><button type="button" class="secondary" data-action="export" data-category="${escapeHtml(category.id)}">Export</button></td>
+                <td><button type="button" class="danger" data-action="delete" data-category="${escapeHtml(category.id)}">Delete</button></td>
+              </tr>
+            `,
+              )
+              .join("")}
+          </tbody>
+        </table>
+      </div>
     </section>
 
     <section class="card">
@@ -198,14 +250,47 @@ function renderReport(report) {
 
   document.getElementById("export-data")?.addEventListener("click", exportData);
   document.getElementById("delete-data")?.addEventListener("click", deleteData);
-  document.getElementById("refresh-report")?.addEventListener("click", loadReport);
+  document
+    .getElementById("refresh-report")
+    ?.addEventListener("click", loadReport);
+
+  root.querySelectorAll("button[data-action]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const action = button.getAttribute("data-action");
+      const categoryId = button.getAttribute("data-category");
+      if (!action || !categoryId) return;
+
+      if (action === "inspect") {
+        const target = document.getElementById(categoryId);
+        if (target) {
+          target.scrollIntoView({ behavior: "smooth", block: "start" });
+          statusEl.textContent = `Inspecting ${categoryId}.`;
+        }
+        return;
+      }
+
+      if (action === "export") {
+        await exportData();
+        statusEl.textContent = `Export triggered for ${categoryId}.`;
+        return;
+      }
+
+      if (action === "delete") {
+        await deleteData();
+        statusEl.textContent = `Delete workflow executed from ${categoryId}.`;
+      }
+    });
+  });
 }
 
 async function loadReport() {
   statusEl.textContent = "Loading current-session human rights report…";
   const session = await ensureSession();
-  const response = await apiFetch(`/api/human-rights/report?sessionId=${encodeURIComponent(session.sessionId)}`);
-  if (!response.ok) throw new Error(`Report request failed: ${response.status}`);
+  const response = await apiFetch(
+    `/api/human-rights/report?sessionId=${encodeURIComponent(session.sessionId)}`,
+  );
+  if (!response.ok)
+    throw new Error(`Report request failed: ${response.status}`);
   reportCache = await response.json();
   renderReport(reportCache);
   statusEl.textContent = "Report ready.";
@@ -213,10 +298,16 @@ async function loadReport() {
 
 async function exportData() {
   statusEl.textContent = "Preparing export…";
-  const response = await apiFetch("/api/data-export", { method: "POST", body: JSON.stringify({ page: pageKey }) });
+  const response = await apiFetch("/api/data-export", {
+    method: "POST",
+    body: JSON.stringify({ page: pageKey }),
+  });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || `Export failed: ${response.status}`);
-  const blob = new Blob([JSON.stringify(data.exportPackage, null, 2)], { type: "application/json" });
+  if (!response.ok)
+    throw new Error(data.error || `Export failed: ${response.status}`);
+  const blob = new Blob([JSON.stringify(data.exportPackage, null, 2)], {
+    type: "application/json",
+  });
   const href = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = href;
@@ -228,9 +319,13 @@ async function exportData() {
 
 async function deleteData() {
   statusEl.textContent = "Deleting current-session data…";
-  const response = await apiFetch("/api/data-delete", { method: "POST", body: JSON.stringify({ reason: "User requested deletion from dashboard." }) });
+  const response = await apiFetch("/api/data-delete", {
+    method: "POST",
+    body: JSON.stringify({ reason: "User requested deletion from dashboard." }),
+  });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || `Delete failed: ${response.status}`);
+  if (!response.ok)
+    throw new Error(data.error || `Delete failed: ${response.status}`);
   statusEl.textContent = data.message || "Current-session data deleted.";
   reportCache = null;
   await loadReport();

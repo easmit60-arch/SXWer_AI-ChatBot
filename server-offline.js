@@ -41,8 +41,15 @@ import {
   clearLocalLedger,
   getConsentStatus,
 } from "./services/blockchain/consentLedger.js";
-import { disconnectWallet, getWalletInfo, isWalletConnected } from "./services/blockchain/walletService.js";
-import { BLOCKCHAIN_ENABLED, INFORMED_CONSENT_DISCLOSURE } from "./services/blockchain/ledgerConfig.js";
+import {
+  disconnectWallet,
+  getWalletInfo,
+  isWalletConnected,
+} from "./services/blockchain/walletService.js";
+import {
+  BLOCKCHAIN_ENABLED,
+  INFORMED_CONSENT_DISCLOSURE,
+} from "./services/blockchain/ledgerConfig.js";
 import {
   getServerPublicKeyBase64,
   getKeyPairMetadata,
@@ -57,7 +64,10 @@ import {
   isValidEnvelope,
   envelopeSummary,
 } from "./services/crypto/messageEncryption.js";
-import { acceptNonce, clearSessionNonces } from "./services/crypto/replayGuard.js";
+import {
+  acceptNonce,
+  clearSessionNonces,
+} from "./services/crypto/replayGuard.js";
 import { ENCRYPTION_DISCLOSURE } from "./services/crypto/cryptoConfig.js";
 import {
   clearAuditTimeline,
@@ -81,6 +91,10 @@ import {
   clearLatestTransparencyRecord,
   getLatestTransparencyRecord,
 } from "./services/human-rights/transparencyService.js";
+import { getGovernanceFlagSnapshot } from "./governance/aiConstitution.js";
+import { applyGovernanceToResponse } from "./middleware/governanceMiddleware.js";
+import { requireConsentForFeature } from "./permissions/ConsentGuard.js";
+import { verifyResourceCollection } from "./ethics/resourceVerifier.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -89,8 +103,10 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const MAX_MESSAGE_LENGTH = Number(process.env.MAX_MESSAGE_LENGTH || 4000);
 const SESSION_ID_PATTERN = /^[a-zA-Z0-9_-]{1,64}$/;
-const ALLOWED_ORIGINS = (process.env.CORS_ALLOWED_ORIGINS ||
-  "http://localhost:3000,http://127.0.0.1:3000")
+const ALLOWED_ORIGINS = (
+  process.env.CORS_ALLOWED_ORIGINS ||
+  "http://localhost:3000,http://127.0.0.1:3000"
+)
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);
@@ -110,6 +126,7 @@ const CONTENT_SECURITY_POLICY = Object.freeze({
 const HUMAN_RIGHTS_PAGES = Object.freeze([
   "privacy-dashboard",
   "consent-dashboard",
+  "data-dashboard",
   "data-manager",
   "export-center",
   "delete-my-data",
@@ -127,6 +144,7 @@ const ACCESSIBILITY_GUARANTEES = Object.freeze([
   "Status live regions for export and delete actions.",
   "Offline-first controls remain available without AI consent.",
 ]);
+const GOVERNANCE_FLAGS = getGovernanceFlagSnapshot();
 
 // ============================================================================
 // SECURITY MIDDLEWARE CONFIGURATION
@@ -154,7 +172,8 @@ const limiter = rateLimit({
   max: 100, // limit each IP to 100 requests per windowMs
   message: {
     error: "Too many requests",
-    details: "Please try again later. If you believe this is an error, contact support.",
+    details:
+      "Please try again later. If you believe this is an error, contact support.",
   },
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
@@ -169,7 +188,8 @@ app.use(cookieParser());
 const sessionTokens = new Map();
 
 function generateSessionToken() {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   let token = "";
   for (let i = 0; i < 32; i++) {
     token += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -180,10 +200,19 @@ function generateSessionToken() {
 function createSession() {
   const token = generateSessionToken();
   const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  sessionTokens.set(token, { sessionId, createdAt: Date.now(), lastUsed: Date.now() });
-  recordAuditEvent(sessionId, "session.created", "Created a new anonymous local session.", {
-    offlineMode: OFFLINE_MODE,
+  sessionTokens.set(token, {
+    sessionId,
+    createdAt: Date.now(),
+    lastUsed: Date.now(),
   });
+  recordAuditEvent(
+    sessionId,
+    "session.created",
+    "Created a new anonymous local session.",
+    {
+      offlineMode: OFFLINE_MODE,
+    },
+  );
   return { token, sessionId };
 }
 
@@ -198,26 +227,39 @@ function validateSessionToken(token) {
 function requireAuth(req, res, next) {
   const token = req.headers["x-session-token"] || req.query.token;
   if (!token) {
-    return res.status(401).json({ error: "Authentication required", details: "Please provide a valid session token" });
+    return res
+      .status(401)
+      .json({
+        error: "Authentication required",
+        details: "Please provide a valid session token",
+      });
   }
   const sessionId = validateSessionToken(token);
   if (!sessionId) {
-    return res.status(401).json({ error: "Invalid session token", details: "The provided session token is invalid or expired" });
+    return res
+      .status(401)
+      .json({
+        error: "Invalid session token",
+        details: "The provided session token is invalid or expired",
+      });
   }
   req.sessionId = sessionId;
   next();
 }
 
 // Session cleanup every hour
-setInterval(() => {
-  const now = Date.now();
-  const SESSION_TTL = 24 * 60 * 60 * 1000;
-  for (const [token, session] of sessionTokens.entries()) {
-    if (now - session.lastUsed > SESSION_TTL) {
-      sessionTokens.delete(token);
+setInterval(
+  () => {
+    const now = Date.now();
+    const SESSION_TTL = 24 * 60 * 60 * 1000;
+    for (const [token, session] of sessionTokens.entries()) {
+      if (now - session.lastUsed > SESSION_TTL) {
+        sessionTokens.delete(token);
+      }
     }
-  }
-}, 60 * 60 * 1000);
+  },
+  60 * 60 * 1000,
+);
 
 // CSRF protection setup
 const csrfProtection = csrf({ cookie: true });
@@ -309,7 +351,8 @@ function validateChatInput(req, res, next) {
   if (message !== undefined && !isValidMessage(message)) {
     return res.status(400).json({
       error: "Invalid message",
-      details: "Message must be a non-empty string with maximum 10,000 characters",
+      details:
+        "Message must be a non-empty string with maximum 10,000 characters",
     });
   }
 
@@ -317,15 +360,20 @@ function validateChatInput(req, res, next) {
   if (consent !== undefined && !isValidConsent(consent)) {
     return res.status(400).json({
       error: "Invalid consent",
-      details: "Consent must be an object with boolean 'ai' and 'tools' properties",
+      details:
+        "Consent must be an object with boolean 'ai' and 'tools' properties",
     });
   }
 
   // Validate localPermissions
-  if (localPermissions !== undefined && !isValidLocalPermissions(localPermissions)) {
+  if (
+    localPermissions !== undefined &&
+    !isValidLocalPermissions(localPermissions)
+  ) {
     return res.status(400).json({
       error: "Invalid local permissions",
-      details: "Local permissions must be an object with boolean 'offline' and string 'scope' properties",
+      details:
+        "Local permissions must be an object with boolean 'offline' and string 'scope' properties",
     });
   }
 
@@ -343,7 +391,10 @@ function validateChatInput(req, res, next) {
 // Middleware
 app.use(express.json({ limit: "1mb" })); // Reduced from 10mb for security
 app.use(express.json({ limit: "1mb" })); // Reduced from 10mb for security
-app.use("/public", express.static(path.join(__dirname, "public"), { index: false }));
+app.use(
+  "/public",
+  express.static(path.join(__dirname, "public"), { index: false }),
+);
 
 // ============================================================================
 // OFFLINE MODE CONFIGURATION
@@ -390,7 +441,9 @@ function resolveSessionId(sessionId = "default") {
   const normalized = String(sessionId || "default").trim();
   // Validate session ID format for security
   if (!isValidSessionId(normalized)) {
-    console.warn(`Invalid session ID format: ${sessionId}, defaulting to "default"`);
+    console.warn(
+      `Invalid session ID format: ${sessionId}, defaulting to "default"`,
+    );
     return "default";
   }
   return normalized || "default";
@@ -464,6 +517,44 @@ function shouldUseOnlineApi(requestedMode) {
   );
 }
 
+function getDefaultHumanRightsChecks() {
+  return {
+    understand: true,
+    consent: true,
+    refuse: true,
+    inspect: true,
+    export: true,
+    delete: true,
+    verify: true,
+    continueOffline: true,
+  };
+}
+
+function evaluateConsentForFeature(feature, sessionId) {
+  return requireConsentForFeature({
+    feature,
+    sessionId,
+    consentState: getConsentDashboard(sessionId).current,
+    rights: getDefaultHumanRightsChecks(),
+  });
+}
+
+function requireFeatureConsent(feature) {
+  return (req, res, next) => {
+    const sessionId = getSessionIdFromRequest(req);
+    const decision = evaluateConsentForFeature(feature, sessionId);
+    if (decision.allowed) {
+      return next();
+    }
+    return res.status(403).json({
+      error: "Consent required",
+      feature,
+      details: decision.reason,
+      evaluation: decision.evaluation,
+    });
+  };
+}
+
 function buildHumanRightsReport(sessionId = "default") {
   const consentDashboard = getConsentDashboard(sessionId);
   const auditTimeline = getAuditTimeline(sessionId);
@@ -491,7 +582,8 @@ function buildHumanRightsReport(sessionId = "default") {
       contentSecurityPolicy:
         "default-src 'self'; connect-src 'self'; frame-ancestors 'none'; object-src 'none'",
       rateLimit: "100 requests per 15 minutes on /api routes.",
-      auditLogging: "Structured in-memory audit events with export and delete controls.",
+      auditLogging:
+        "Structured in-memory audit events with export and delete controls.",
     },
   };
 }
@@ -783,6 +875,7 @@ function buildTransparentChatPayload({
   biasAssessment = { flagged: false, issues: [] },
   extra = {},
 } = {}) {
+  const consentDashboard = getConsentDashboard(sessionId);
   const transparency = buildResponseTransparency({
     sessionId,
     message,
@@ -800,7 +893,9 @@ function buildTransparentChatPayload({
     confidence: aiUsed ? "medium" : "high",
     limitations: aiUsed
       ? ["AI support can be imperfect, incomplete, or shaped by training data."]
-      : ["Local rule-based support may be less tailored than an opted-in AI response."],
+      : [
+          "Local rule-based support may be less tailored than an opted-in AI response.",
+        ],
     safetyChecks: [
       "Anchor",
       "Mirror",
@@ -813,12 +908,36 @@ function buildTransparentChatPayload({
     ],
     biasAssessment,
     explanation,
+    humanRightsChecks: getDefaultHumanRightsChecks(),
+  });
+
+  const governed = applyGovernanceToResponse({
+    responseText: formatResponseForDisplay(response),
+    aiUsed,
+    provider,
+    model: model || "unknown",
+    mode,
+    confidence: aiUsed ? "medium" : "high",
+    limitations: aiUsed
+      ? ["AI output can still contain uncertainty or mistakes."]
+      : ["Local rule-based support may be less tailored."],
+    externalRequests:
+      mode === "online" && aiUsed
+        ? ["User message sent to configured online AI provider"]
+        : ["None"],
+    resourcesConsulted: ["Local safety policy", "Human rights rules"],
+    consentState: consentDashboard.current?.status || "not-set",
+    stored: "Current-session metadata only",
+    shared: mode === "online" && aiUsed ? "Provider request only" : "No",
+    safetyFilters: ["Consent Guard", "Human Rights Review", "Bias Check"],
   });
 
   recordAuditEvent(
     sessionId,
     "response.generated",
-    aiUsed ? "Generated an AI-disclosed response." : "Generated a local-first response.",
+    aiUsed
+      ? "Generated an AI-disclosed response."
+      : "Generated a local-first response.",
     {
       aiUsed,
       provider,
@@ -827,13 +946,15 @@ function buildTransparentChatPayload({
   );
 
   return {
-    response: formatResponseForDisplay(response),
+    response: governed.responseText,
     offline: mode !== "online",
     online: mode === "online",
     provider,
     model,
     aiAssisted: aiUsed,
     transparency,
+    disclosure: governed.disclosure,
+    humanRightsReview: governed.humanRightsReview,
     ...extra,
   };
 }
@@ -936,414 +1057,509 @@ async function callPythonNLP(text, sessionId = "default") {
  * POST /chat - Handle chat messages
  * Enforces all ethical constraints
  */
-app.post("/api/chat", validateChatInput, csrfProtection, requireAuth, async (req, res) => {
-  try {
-    const { message: rawMessage, consent, localPermissions, mode } = req.body;
-    const sessionId = getSessionIdFromRequest(req);
-    const message = sanitizeUserMessage(rawMessage);
-    const requestedMode = getRequestedMode(mode);
-    const onlineModeAllowed = shouldAllowOnlineMode(requestedMode);
-    const onlineApiActive = shouldUseOnlineApi(requestedMode);
+app.post(
+  "/api/chat",
+  validateChatInput,
+  csrfProtection,
+  requireAuth,
+  async (req, res) => {
+    try {
+      const { message: rawMessage, consent, localPermissions, mode } = req.body;
+      const sessionId = getSessionIdFromRequest(req);
+      const message = sanitizeUserMessage(rawMessage);
+      const requestedMode = getRequestedMode(mode);
+      const onlineModeAllowed = shouldAllowOnlineMode(requestedMode);
+      const onlineApiActive = shouldUseOnlineApi(requestedMode);
 
-    if (!message) {
-      return res.status(400).json({
-        error: "Message is required and must be a non-empty string.",
-      });
-    }
-    if (message.length > MAX_MESSAGE_LENGTH) {
-      return res.status(400).json({
-        error: `Message exceeds maximum length of ${MAX_MESSAGE_LENGTH} characters.`,
-      });
-    }
+      if (!message) {
+        return res.status(400).json({
+          error: "Message is required and must be a non-empty string.",
+        });
+      }
+      if (message.length > MAX_MESSAGE_LENGTH) {
+        return res.status(400).json({
+          error: `Message exceeds maximum length of ${MAX_MESSAGE_LENGTH} characters.`,
+        });
+      }
 
-    // Update consent if provided
-    if (consent && typeof consent === "object") {
-      setUserConsent(consent.ai, consent.tools, sessionId);
-      updateConsentFromLegacy(sessionId, {
-        ai: consent.ai,
-        tools: consent.tools,
-        reason: consent.reason || "User updated chat consent preferences.",
-        aiProvider: requestedMode === "online" ? "mistral" : "local",
-        expiry: consent.expiry || null,
-      });
-    }
+      // Update consent if provided
+      if (consent && typeof consent === "object") {
+        setUserConsent(consent.ai, consent.tools, sessionId);
+        updateConsentFromLegacy(sessionId, {
+          ai: consent.ai,
+          tools: consent.tools,
+          reason: consent.reason || "User updated chat consent preferences.",
+          aiProvider: requestedMode === "online" ? "mistral" : "local",
+          expiry: consent.expiry || null,
+        });
+      }
 
-    if (localPermissions && typeof localPermissions === "object") {
-      setLocalPermissions(sessionId, localPermissions);
-    }
+      if (localPermissions && typeof localPermissions === "object") {
+        setLocalPermissions(sessionId, localPermissions);
+      }
 
-    // Check for Sherlock command
-    // Check for tool commands
-    const toolResponse = await handleToolRequest(message, {
-      sessionId,
-      hasToolConsent: hasToolConsent(sessionId),
-      formatHumanNLP,
-      truncateForMirror,
-    });
-    if (toolResponse) {
-      return res.json(buildTransparentChatPayload({
+      // Check for Sherlock command
+      // Check for tool commands
+      const toolResponse = await handleToolRequest(message, {
         sessionId,
-        message,
-        response: toolResponse,
-        provider: "local-tooling",
-        extra: {
-        isTool: true,
-        tool: toolResponse.tool,
-        },
-      }));
-    }
-    
-
-    if (message && message.startsWith("/sherlock ")) {
-      const username = message.substring(10).trim();
-
-      if (requestedMode === "offline" && !hasOfflineLocalPermission(sessionId)) {
-        return res.json({
-          response: formatResponseForDisplay(
-            formatHumanNLP({
-              userInput: message,
-              anchor: "Offline local access requires your permission.",
-              mirror: `You requested: "${message}"`,
-              reframe:
-                "This app can use local-only data for safety checks only after you explicitly allow it.",
-              rapport:
-                "Would you like to allow local-only access for this offline session?",
-            }),
-          ),
-          requiresLocalPermission: true,
-          localPermissionScope: "offline",
-        });
+        hasToolConsent: hasToolConsent(sessionId),
+        formatHumanNLP,
+        truncateForMirror,
+      });
+      if (toolResponse) {
+        return res.json(
+          buildTransparentChatPayload({
+            sessionId,
+            message,
+            response: toolResponse,
+            provider: "local-tooling",
+            extra: {
+              isTool: true,
+              tool: toolResponse.tool,
+            },
+          }),
+        );
       }
 
-      // Check Sherlock protocol
-      const protocolCheck = checkSherlockProtocol(message, { sessionId });
-
-      if (!protocolCheck.allowed && protocolCheck.reason !== "EXPLICIT_CONSENT_REQUIRED") {
-        return res.json({
-          response: formatResponseForDisplay(
-            formatHumanNLP({
-              userInput: message,
-              anchor: "I need to ensure Sherlock is used appropriately.",
-              mirror: `You requested: "${message}"`,
-              reframe: protocolCheck.message,
-              rapport:
-                "Would you like to rephrase this as a safety check for your own username?",
-            }),
-          ),
-          requiresConsent: false,
-        });
-      }
-
-      if (!protocolCheck.allowed || !hasToolConsent(sessionId)) {
-        pendingSherlockStore.set(sessionId, username);
-        const response = requestSherlockConsent(username);
-        return res.json({
-          response: formatResponseForDisplay(response),
-          requiresConsent: true,
-          consentType: "sherlock",
-        });
-      }
-
-      // Perform offline Sherlock search
-      const results = offlineSherlockSearch([username]);
-
-      const response = formatHumanNLP({
-        userInput: message,
-        anchor: "Sherlock search completed (offline mode).",
-        mirror: `You requested: "${message}"`,
-        reframe: `Here are the results from local database: ${JSON.stringify(results.results)}. ${results.disclaimer}`,
-        rapport:
-          "Would you like help interpreting these results or planning next steps?",
-      });
-
-      return res.json({
-        response: formatResponseForDisplay(response),
-        results: results.results,
-        offline: true,
-      });
-    }
-
-    // Handle /resources and /help commands
-    if (message === "/resources" || message === "/help") {
-      const response = formatHumanNLP({
-        userInput: message,
-        anchor: "Here are resources and support organizations for sex workers:",
-        mirror: `You asked: "${message}"`,
-        reframe:
-          "These organizations provide support, advocacy, and resources:",
-        rapport:
-          "Type /sherlock username - Check username (safety verification only)\n/moxie message - Talk to Moxie\n/consent yes - Enable AI\n/get_time - Get current time\n/translate text to language - Translate text\n/sherlock_ai username - AI-enhanced safety verification\n/consent no - Disable AI\n/resources - Show this list",
-      });
-
-      // Include resources in the response
-      return res.json({
-        response: formatResponseForDisplay(response),
-        resources: resources.organizations,
-        crisis_resources: resources.crisis_resources,
-        safety_tips: resources.safety_tips,
-      });
-    }
-
-    // Check for Moxie command
-    if (message && message.startsWith("/moxie ")) {
-      const moxieMessage = message.substring(7).trim();
-      const response = formatHumanNLP({
-        userInput: message,
-        anchor: `${MOXIE_CONFIG.name} hears you.`,
-        mirror: `You said to ${MOXIE_CONFIG.name}: "${moxieMessage}"`,
-        reframe: `${MOXIE_CONFIG.name} is your companion, here to provide gentle support and reminders.`,
-        rapport: `Would you like ${MOXIE_CONFIG.name} to check in more often?`,
-      });
-
-      return res.json({
-        response: formatResponseForDisplay(response),
-        from: MOXIE_CONFIG.name,
-      });
-    }
-
-    // Check for consent grant
-    if (
-      message &&
-      (message.toLowerCase() === "yes" ||
-        message.toLowerCase() === "/consent yes")
-    ) {
-      const pendingSherlockUsername = pendingSherlockStore.get(sessionId) || null;
-      if (pendingSherlockUsername) {
-        setUserConsent(hasAIConsent(sessionId), true, sessionId);
-        pendingSherlockStore.delete(sessionId);
-
-        if (requestedMode === "offline" && !hasOfflineLocalPermission(sessionId)) {
+      if (message && message.startsWith("/sherlock ")) {
+        const sherlockConsent = evaluateConsentForFeature(
+          "sherlock",
+          sessionId,
+        );
+        if (!sherlockConsent.allowed) {
           return res.json({
             response: formatResponseForDisplay(
               formatHumanNLP({
                 userInput: message,
-                anchor: "Sherlock consent saved.",
-                mirror: `You said: "${message}"`,
+                anchor: "Sherlock is blocked until consent checks pass.",
+                mirror: `You requested: "${message}"`,
+                reframe: sherlockConsent.reason,
+                rapport:
+                  "You can continue in offline chat mode without Sherlock while keeping control of your data.",
+              }),
+            ),
+            requiresConsent: true,
+            consentType: "sherlock",
+          });
+        }
+
+        const username = message.substring(10).trim();
+
+        if (
+          requestedMode === "offline" &&
+          !hasOfflineLocalPermission(sessionId)
+        ) {
+          return res.json({
+            response: formatResponseForDisplay(
+              formatHumanNLP({
+                userInput: message,
+                anchor: "Offline local access requires your permission.",
+                mirror: `You requested: "${message}"`,
                 reframe:
-                  "I still need local-only permission before running the offline Sherlock check.",
+                  "This app can use local-only data for safety checks only after you explicitly allow it.",
                 rapport:
                   "Would you like to allow local-only access for this offline session?",
               }),
             ),
             requiresLocalPermission: true,
             localPermissionScope: "offline",
-            consentGranted: true,
-            consent: getConsentState(sessionId),
+          });
+        }
+
+        // Check Sherlock protocol
+        const protocolCheck = checkSherlockProtocol(message, { sessionId });
+
+        if (
+          !protocolCheck.allowed &&
+          protocolCheck.reason !== "EXPLICIT_CONSENT_REQUIRED"
+        ) {
+          return res.json({
+            response: formatResponseForDisplay(
+              formatHumanNLP({
+                userInput: message,
+                anchor: "I need to ensure Sherlock is used appropriately.",
+                mirror: `You requested: "${message}"`,
+                reframe: protocolCheck.message,
+                rapport:
+                  "Would you like to rephrase this as a safety check for your own username?",
+              }),
+            ),
+            requiresConsent: false,
+          });
+        }
+
+        if (!protocolCheck.allowed || !hasToolConsent(sessionId)) {
+          pendingSherlockStore.set(sessionId, username);
+          const response = requestSherlockConsent(username);
+          return res.json({
+            response: formatResponseForDisplay(response),
+            requiresConsent: true,
             consentType: "sherlock",
           });
         }
 
-        const results = offlineSherlockSearch([pendingSherlockUsername]);
-        const sherlockResponse = formatHumanNLP({
-          userInput: `/sherlock ${pendingSherlockUsername}`,
-          anchor: "Consent confirmed and Sherlock search completed (offline mode).",
-          mirror: `You confirmed consent for: "${pendingSherlockUsername}"`,
+        // Perform offline Sherlock search
+        const results = offlineSherlockSearch([username]);
+
+        const response = formatHumanNLP({
+          userInput: message,
+          anchor: "Sherlock search completed (offline mode).",
+          mirror: `You requested: "${message}"`,
           reframe: `Here are the results from local database: ${JSON.stringify(results.results)}. ${results.disclaimer}`,
           rapport:
             "Would you like help interpreting these results or planning next steps?",
         });
 
         return res.json({
-          response: formatResponseForDisplay(sherlockResponse),
+          response: formatResponseForDisplay(response),
           results: results.results,
           offline: true,
+        });
+      }
+
+      // Handle /resources and /help commands
+      if (message === "/resources" || message === "/help") {
+        const verifiedResources = verifyResourceCollection(
+          resources.organizations || [],
+        );
+        const response = formatHumanNLP({
+          userInput: message,
+          anchor:
+            "Here are resources and support organizations for sex workers:",
+          mirror: `You asked: "${message}"`,
+          reframe:
+            "These organizations provide support, advocacy, and resources:",
+          rapport:
+            "Type /sherlock username - Check username (safety verification only)\n/moxie message - Talk to Moxie\n/consent yes - Enable AI\n/get_time - Get current time\n/translate text to language - Translate text\n/sherlock_ai username - AI-enhanced safety verification\n/consent no - Disable AI\n/resources - Show this list",
+        });
+
+        // Include resources in the response
+        return res.json({
+          response: formatResponseForDisplay(response),
+          resources: verifiedResources.verified,
+          resourceVerification: {
+            verifiedCount: verifiedResources.verified.length,
+            rejectedCount: verifiedResources.rejected.length,
+          },
+          crisis_resources: resources.crisis_resources,
+          safety_tips: resources.safety_tips,
+        });
+      }
+
+      // Check for Moxie command
+      if (message && message.startsWith("/moxie ")) {
+        const voiceConsent = evaluateConsentForFeature("voice", sessionId);
+        if (!voiceConsent.allowed) {
+          return res.json({
+            response: formatResponseForDisplay(
+              formatHumanNLP({
+                userInput: message,
+                anchor: "Moxie advanced features are currently limited.",
+                mirror: `You requested: "${message}"`,
+                reframe: voiceConsent.reason,
+                rapport:
+                  "You can keep using text-only support while refusing voice or microphone permissions.",
+              }),
+            ),
+            requiresConsent: true,
+            consentType: "voice",
+          });
+        }
+
+        const moxieMessage = message.substring(7).trim();
+        const response = formatHumanNLP({
+          userInput: message,
+          anchor: `${MOXIE_CONFIG.name} hears you.`,
+          mirror: `You said to ${MOXIE_CONFIG.name}: "${moxieMessage}"`,
+          reframe: `${MOXIE_CONFIG.name} is your companion, here to provide gentle support and reminders.`,
+          rapport: `Would you like ${MOXIE_CONFIG.name} to check in more often?`,
+        });
+
+        return res.json({
+          response: formatResponseForDisplay(response),
+          from: MOXIE_CONFIG.name,
+        });
+      }
+
+      // Check for consent grant
+      if (
+        message &&
+        (message.toLowerCase() === "yes" ||
+          message.toLowerCase() === "/consent yes")
+      ) {
+        const pendingSherlockUsername =
+          pendingSherlockStore.get(sessionId) || null;
+        if (pendingSherlockUsername) {
+          setUserConsent(hasAIConsent(sessionId), true, sessionId);
+          pendingSherlockStore.delete(sessionId);
+
+          if (
+            requestedMode === "offline" &&
+            !hasOfflineLocalPermission(sessionId)
+          ) {
+            return res.json({
+              response: formatResponseForDisplay(
+                formatHumanNLP({
+                  userInput: message,
+                  anchor: "Sherlock consent saved.",
+                  mirror: `You said: "${message}"`,
+                  reframe:
+                    "I still need local-only permission before running the offline Sherlock check.",
+                  rapport:
+                    "Would you like to allow local-only access for this offline session?",
+                }),
+              ),
+              requiresLocalPermission: true,
+              localPermissionScope: "offline",
+              consentGranted: true,
+              consent: getConsentState(sessionId),
+              consentType: "sherlock",
+            });
+          }
+
+          const results = offlineSherlockSearch([pendingSherlockUsername]);
+          const sherlockResponse = formatHumanNLP({
+            userInput: `/sherlock ${pendingSherlockUsername}`,
+            anchor:
+              "Consent confirmed and Sherlock search completed (offline mode).",
+            mirror: `You confirmed consent for: "${pendingSherlockUsername}"`,
+            reframe: `Here are the results from local database: ${JSON.stringify(results.results)}. ${results.disclaimer}`,
+            rapport:
+              "Would you like help interpreting these results or planning next steps?",
+          });
+
+          return res.json({
+            response: formatResponseForDisplay(sherlockResponse),
+            results: results.results,
+            offline: true,
+            consentGranted: true,
+            consent: getConsentState(sessionId),
+            consentType: "sherlock",
+          });
+        } else {
+          setUserConsent(true, true, sessionId);
+        }
+        updateConsentFromLegacy(sessionId, {
+          ai: true,
+          tools: true,
+          reason: "User granted consent through the chat command flow.",
+          aiProvider: requestedMode === "online" ? "mistral" : "local",
+        });
+        const response = formatHumanNLP({
+          userInput: message,
+          anchor: "Thank you for your consent.",
+          mirror: `You said: "${message}"`,
+          reframe:
+            "I will now use AI assistance to provide more tailored responses. Remember, you can revoke consent at any time.",
+          rapport: "What would you like to talk about?",
+        });
+
+        return res.json({
+          response: formatResponseForDisplay(response),
           consentGranted: true,
           consent: getConsentState(sessionId),
-          consentType: "sherlock",
+          consentType: pendingSherlockUsername ? "sherlock" : "ai",
         });
-      } else {
-        setUserConsent(true, true, sessionId);
       }
-      updateConsentFromLegacy(sessionId, {
-        ai: true,
-        tools: true,
-        reason: "User granted consent through the chat command flow.",
-        aiProvider: requestedMode === "online" ? "mistral" : "local",
-      });
-      const response = formatHumanNLP({
-        userInput: message,
-        anchor: "Thank you for your consent.",
-        mirror: `You said: "${message}"`,
-        reframe:
-          "I will now use AI assistance to provide more tailored responses. Remember, you can revoke consent at any time.",
-        rapport: "What would you like to talk about?",
-      });
 
-      return res.json({
-        response: formatResponseForDisplay(response),
-        consentGranted: true,
-        consent: getConsentState(sessionId),
-        consentType: pendingSherlockUsername ? "sherlock" : "ai",
-      });
-    }
-
-    // Check for consent revoke
-    if (
-      message &&
-      (message.toLowerCase() === "no" ||
-        message.toLowerCase() === "/consent no")
-    ) {
-      setUserConsent(false, false, sessionId);
-      revokeConsentScopes(
-        sessionId,
-        ["ai", "sherlock", "resources", "internet", "voice", "microphone", "analytics", "blockchain", "futureIntegrations"],
-        "User revoked consent through the chat command flow.",
-      );
-      pendingSherlockStore.delete(sessionId);
-      const response = formatHumanNLP({
-        userInput: message,
-        anchor: "Consent revoked.",
-        mirror: `You said: "${message}"`,
-        reframe:
-          "I will now only use local, curated responses. Your privacy and safety remain the priority.",
-        rapport: "How can I assist you with local knowledge?",
-      });
-
-      return res.json({
-        response: formatResponseForDisplay(response),
-        consentRevoked: true,
-        consent: getConsentState(sessionId),
-      });
-    }
-
-    // Process through ethical chatbot
-    const response = chatbot.processMessage(message, {
-      isSherlockRequest: false,
-      forceLocal: !hasAIConsent(sessionId),
-      sessionId,
-    });
-
-    // Enhanced safety check: use Python ML classifier when available,
-    // in addition to the built-in keyword detection already run above.
-    const pythonSafety = await callPythonSafetyClassifier(message);
-    if (
-      pythonSafety &&
-      pythonSafety.is_sensitive &&
-      pythonSafety.label === "crisis"
-    ) {
-      // Python classifier found a crisis signal not caught by keywords
-      const crisisResponse = formatHumanNLP({
-        userInput: message,
-        anchor: "That sounds really painful. You're not alone.",
-        mirror: `You shared: "${truncateForMirror(message, 50)}"`,
-        reframe: `I'm not a therapist or replacement for human connection. Your feelings are valid, and your safety matters.`,
-        rapport: `Are you safe right now? Crisis Text Line is available 24/7: Text HOME to 741741. Would you like more resources?`,
-        isCrisis: true,
-      });
-      return res.json({
-        ...buildTransparentChatPayload({
+      // Check for consent revoke
+      if (
+        message &&
+        (message.toLowerCase() === "no" ||
+          message.toLowerCase() === "/consent no")
+      ) {
+        setUserConsent(false, false, sessionId);
+        revokeConsentScopes(
           sessionId,
-          message,
-          response: crisisResponse,
-          provider: "local-safety",
-        }),
-        safetyFlag: pythonSafety,
-        isCrisis: true,
-      });
-    }
-
-    // AI-assisted response: try Python local LLM first (fully on-device),
-    // then fall back to external Mistral API, then to local ethical response.
-    const pythonNlp = await callPythonNLP(message, sessionId);
-
-    if (hasAIConsent(sessionId)) {
-      // 1. Python local LLM (Ollama — no external API, highest privacy)
-      const localLLMText = await callPythonLocalLLM(message, sessionId);
-      if (localLLMText) {
-        const localLLMResult = buildExplainedAIResult(
-          message,
-          localLLMText,
-          "ollama",
-          "offline",
+          [
+            "ai",
+            "sherlock",
+            "resources",
+            "internet",
+            "voice",
+            "microphone",
+            "analytics",
+            "blockchain",
+            "futureIntegrations",
+          ],
+          "User revoked consent through the chat command flow.",
         );
+        pendingSherlockStore.delete(sessionId);
+        const response = formatHumanNLP({
+          userInput: message,
+          anchor: "Consent revoked.",
+          mirror: `You said: "${message}"`,
+          reframe:
+            "I will now only use local, curated responses. Your privacy and safety remain the priority.",
+          rapport: "How can I assist you with local knowledge?",
+        });
+
+        return res.json({
+          response: formatResponseForDisplay(response),
+          consentRevoked: true,
+          consent: getConsentState(sessionId),
+        });
+      }
+
+      // Process through ethical chatbot
+      const response = chatbot.processMessage(message, {
+        isSherlockRequest: false,
+        forceLocal: !hasAIConsent(sessionId),
+        sessionId,
+      });
+
+      // Enhanced safety check: use Python ML classifier when available,
+      // in addition to the built-in keyword detection already run above.
+      const pythonSafety = await callPythonSafetyClassifier(message);
+      if (
+        pythonSafety &&
+        pythonSafety.is_sensitive &&
+        pythonSafety.label === "crisis"
+      ) {
+        // Python classifier found a crisis signal not caught by keywords
+        const crisisResponse = formatHumanNLP({
+          userInput: message,
+          anchor: "That sounds really painful. You're not alone.",
+          mirror: `You shared: "${truncateForMirror(message, 50)}"`,
+          reframe: `I'm not a therapist or replacement for human connection. Your feelings are valid, and your safety matters.`,
+          rapport: `Are you safe right now? Crisis Text Line is available 24/7: Text HOME to 741741. Would you like more resources?`,
+          isCrisis: true,
+        });
         return res.json({
           ...buildTransparentChatPayload({
             sessionId,
             message,
-            response: localLLMResult.response,
-            provider: "ollama",
-            model: "ollama-local",
-            mode: "offline",
-            aiUsed: true,
-            explanation: localLLMResult.explanation,
-            biasAssessment: localLLMResult.biasAssessment,
+            response: crisisResponse,
+            provider: "local-safety",
           }),
-          explanation: localLLMResult.explanation,
-          biasAssessment: localLLMResult.biasAssessment,
-          aiSafeguarded: localLLMResult.aiSafeguarded,
-          nlp: pythonNlp,
+          safetyFlag: pythonSafety,
+          isCrisis: true,
         });
       }
 
-      // 2. External Mistral API (online mode only)
-      if (onlineApiActive) {
-        try {
-          const aiText = await callOnlineModel(message);
-          const onlineResult = buildExplainedAIResult(
+      // AI-assisted response: try Python local LLM first (fully on-device),
+      // then fall back to external Mistral API, then to local ethical response.
+      const pythonNlp = await callPythonNLP(message, sessionId);
+
+      if (hasAIConsent(sessionId)) {
+        // 1. Python local LLM (Ollama — no external API, highest privacy)
+        const localLLMText = await callPythonLocalLLM(message, sessionId);
+        if (localLLMText) {
+          const localLLMResult = buildExplainedAIResult(
             message,
-            aiText,
-            "mistral",
-            "online",
+            localLLMText,
+            "ollama",
+            "offline",
           );
           return res.json({
             ...buildTransparentChatPayload({
               sessionId,
               message,
-              response: onlineResult.response,
-              provider: "mistral",
-              model: MISTRAL_MODEL,
-              mode: "online",
+              response: localLLMResult.response,
+              provider: "ollama",
+              model: "ollama-local",
+              mode: "offline",
               aiUsed: true,
-              explanation: onlineResult.explanation,
-              biasAssessment: onlineResult.biasAssessment,
+              explanation: localLLMResult.explanation,
+              biasAssessment: localLLMResult.biasAssessment,
             }),
-            explanation: onlineResult.explanation,
-            biasAssessment: onlineResult.biasAssessment,
-            aiSafeguarded: onlineResult.aiSafeguarded,
+            explanation: localLLMResult.explanation,
+            biasAssessment: localLLMResult.biasAssessment,
+            aiSafeguarded: localLLMResult.aiSafeguarded,
             nlp: pythonNlp,
           });
-        } catch (error) {
-          console.warn(
-            "Online API call failed, falling back to local response:",
-            error.message,
+        }
+
+        // 2. External Mistral API (online mode only)
+        if (onlineApiActive) {
+          const onlineConsent = evaluateConsentForFeature(
+            "online-ai",
+            sessionId,
           );
+          if (!onlineConsent.allowed) {
+            return res.json({
+              ...buildTransparentChatPayload({
+                sessionId,
+                message,
+                response: createEthicalAIResponse(message),
+                provider: "local-curated",
+                model: localModel?.name || null,
+                mode: "offline",
+                extra: {
+                  governanceBlock: onlineConsent.reason,
+                },
+              }),
+            });
+          }
+
+          try {
+            const aiText = await callOnlineModel(message);
+            const onlineResult = buildExplainedAIResult(
+              message,
+              aiText,
+              "mistral",
+              "online",
+            );
+            return res.json({
+              ...buildTransparentChatPayload({
+                sessionId,
+                message,
+                response: onlineResult.response,
+                provider: "mistral",
+                model: MISTRAL_MODEL,
+                mode: "online",
+                aiUsed: true,
+                explanation: onlineResult.explanation,
+                biasAssessment: onlineResult.biasAssessment,
+              }),
+              explanation: onlineResult.explanation,
+              biasAssessment: onlineResult.biasAssessment,
+              aiSafeguarded: onlineResult.aiSafeguarded,
+              nlp: pythonNlp,
+            });
+          } catch (error) {
+            console.warn(
+              "Online API call failed, falling back to local response:",
+              error.message,
+            );
+          }
         }
       }
+
+      // Default: ethical local response
+      return res.json({
+        ...buildTransparentChatPayload({
+          sessionId,
+          message,
+          response,
+          provider: "local-curated",
+          model: localModel?.name || null,
+          mode: "offline",
+          extra: {
+            offline: !onlineApiActive,
+            online: onlineApiActive,
+          },
+        }),
+        nlp: pythonNlp,
+      });
+    } catch (error) {
+      console.error("Chat error:", error);
+      const response = formatHumanNLP({
+        userInput: req.body?.message || "",
+        anchor: "I encountered an error processing your request.",
+        mirror: `You requested: "${req.body?.message || "unknown"}"`,
+        reframe:
+          "This might be due to offline mode limitations or a technical issue.",
+        rapport: "Would you like to try again or use a different approach?",
+      });
+
+      return res.status(500).json({
+        response: formatResponseForDisplay(response),
+        error: error.message,
+      });
     }
-
-    // Default: ethical local response
-    return res.json({
-      ...buildTransparentChatPayload({
-        sessionId,
-        message,
-        response,
-        provider: "local-curated",
-        model: localModel?.name || null,
-        mode: "offline",
-        extra: {
-          offline: !onlineApiActive,
-          online: onlineApiActive,
-        },
-      }),
-      nlp: pythonNlp,
-    });
-  } catch (error) {
-    console.error("Chat error:", error);
-    const response = formatHumanNLP({
-      userInput: req.body?.message || "",
-      anchor: "I encountered an error processing your request.",
-      mirror: `You requested: "${req.body?.message || "unknown"}"`,
-      reframe:
-        "This might be due to offline mode limitations or a technical issue.",
-      rapport: "Would you like to try again or use a different approach?",
-    });
-
-    return res.status(500).json({
-      response: formatResponseForDisplay(response),
-      error: error.message,
-    });
-  }
-});
+  },
+);
 
 // ============================================================================
 // E2E ENCRYPTION ENDPOINTS
@@ -1363,52 +1579,49 @@ app.post("/api/chat", validateChatInput, csrfProtection, requireAuth, async (req
  *
  * No sensitive data is logged.
  */
-app.post(
-  "/api/crypto/handshake",
-  csrfProtection,
-  requireAuth,
-  (req, res) => {
-    try {
-      const { clientPublicKey } = req.body;
-      const sessionId = getSessionIdFromRequest(req);
+app.post("/api/crypto/handshake", csrfProtection, requireAuth, (req, res) => {
+  try {
+    const { clientPublicKey } = req.body;
+    const sessionId = getSessionIdFromRequest(req);
 
-      if (typeof clientPublicKey !== "string" || !clientPublicKey) {
-        return res.status(400).json({
-          error: "clientPublicKey is required and must be a Base64 string",
-        });
-      }
-
-      // Store the client's public key for this session
-      try {
-        registerClientPublicKey(sessionId, clientPublicKey);
-      } catch (keyErr) {
-        return res.status(400).json({
-          error: "Invalid clientPublicKey",
-          details: keyErr.message,
-        });
-      }
-
-      // Clear any stale nonces for this session (fresh handshake = fresh session)
-      clearSessionNonces(sessionId);
-
-      console.log("[CRYPTO] Handshake complete for session (key material not logged).");
-
-      return res.json({
-        serverPublicKey: getServerPublicKeyBase64(),
-        schemaVersion: "sxwer-e2e-v1",
-        encryption: {
-          algorithm: "X25519-XSalsa20-Poly1305",
-          keyExchange: "Diffie-Hellman (ephemeral, per-session)",
-          forwardSecrecy: true,
-          onlineApiNotice: ENCRYPTION_DISCLOSURE.onlineApiNotice,
-        },
+    if (typeof clientPublicKey !== "string" || !clientPublicKey) {
+      return res.status(400).json({
+        error: "clientPublicKey is required and must be a Base64 string",
       });
-    } catch (err) {
-      console.error("[CRYPTO] Handshake error:", err.message);
-      return res.status(500).json({ error: "Handshake failed" });
     }
-  },
-);
+
+    // Store the client's public key for this session
+    try {
+      registerClientPublicKey(sessionId, clientPublicKey);
+    } catch (keyErr) {
+      return res.status(400).json({
+        error: "Invalid clientPublicKey",
+        details: keyErr.message,
+      });
+    }
+
+    // Clear any stale nonces for this session (fresh handshake = fresh session)
+    clearSessionNonces(sessionId);
+
+    console.log(
+      "[CRYPTO] Handshake complete for session (key material not logged).",
+    );
+
+    return res.json({
+      serverPublicKey: getServerPublicKeyBase64(),
+      schemaVersion: "sxwer-e2e-v1",
+      encryption: {
+        algorithm: "X25519-XSalsa20-Poly1305",
+        keyExchange: "Diffie-Hellman (ephemeral, per-session)",
+        forwardSecrecy: true,
+        onlineApiNotice: ENCRYPTION_DISCLOSURE.onlineApiNotice,
+      },
+    });
+  } catch (err) {
+    console.error("[CRYPTO] Handshake error:", err.message);
+    return res.status(500).json({ error: "Handshake failed" });
+  }
+});
 
 /**
  * GET /api/crypto/server-key
@@ -1512,7 +1725,8 @@ app.post(
       const storedClientKey = getClientPublicKey(sessionId);
       if (!storedClientKey) {
         return res.status(401).json({
-          error: "No handshake found for this session. Call /api/crypto/handshake first.",
+          error:
+            "No handshake found for this session. Call /api/crypto/handshake first.",
         });
       }
 
@@ -1521,7 +1735,8 @@ app.post(
       const { encodeBase64: b64enc, decodeBase64: b64dec } = naclUtil;
       if (envelope.clientPublicKey !== b64enc(storedClientKey)) {
         return res.status(401).json({
-          error: "clientPublicKey mismatch: key does not match the registered handshake key",
+          error:
+            "clientPublicKey mismatch: key does not match the registered handshake key",
         });
       }
 
@@ -1530,7 +1745,9 @@ app.post(
       let plaintext;
       try {
         const { default: naclUtilInner } = await import("tweetnacl-util");
-        const clientPubKey = naclUtilInner.decodeBase64(envelope.clientPublicKey);
+        const clientPubKey = naclUtilInner.decodeBase64(
+          envelope.clientPublicKey,
+        );
         plaintext = decryptMessage(
           envelope.ciphertext,
           envelope.nonce,
@@ -1541,7 +1758,8 @@ app.post(
         console.warn("[CRYPTO] Decryption failed:", decryptErr.message);
         return res.status(400).json({
           error: "Decryption failed",
-          details: "Message authentication tag did not match. The message may have been tampered with.",
+          details:
+            "Message authentication tag did not match. The message may have been tampered with.",
         });
       }
 
@@ -1559,7 +1777,9 @@ app.post(
         return res.status(400).json({ error: "Decrypted message is empty" });
       }
       if (message.length > MAX_MESSAGE_LENGTH) {
-        return res.status(400).json({ error: "Message exceeds maximum length" });
+        return res
+          .status(400)
+          .json({ error: "Message exceeds maximum length" });
       }
 
       if (consent && typeof consent === "object") {
@@ -1598,7 +1818,9 @@ app.post(
 
       // 7. Encrypt the response for the client
       const { default: naclUtilResp } = await import("tweetnacl-util");
-      const clientPubKeyBytes = naclUtilResp.decodeBase64(envelope.clientPublicKey);
+      const clientPubKeyBytes = naclUtilResp.decodeBase64(
+        envelope.clientPublicKey,
+      );
       const encryptedResponse = encryptMessage(
         responseText,
         clientPubKeyBytes,
@@ -1635,7 +1857,9 @@ app.post(
         }
       }
 
-      return res.status(500).json({ error: "Encrypted chat processing failed" });
+      return res
+        .status(500)
+        .json({ error: "Encrypted chat processing failed" });
     }
   },
 );
@@ -1658,7 +1882,8 @@ app.post(
     console.log("[CRYPTO] Client key rotation acknowledged for session.");
     return res.json({
       rotated: true,
-      message: "Client key cleared. Call /api/crypto/handshake to register your new key.",
+      message:
+        "Client key cleared. Call /api/crypto/handshake to register your new key.",
     });
   },
 );
@@ -1814,26 +2039,32 @@ app.post("/api/consent", csrfProtection, requireAuth, (req, res) => {
     });
   }
   setUserConsent(ai, tools, sessionId);
-  const versionedConsent = scopes && typeof scopes === "object"
-    ? setConsentState(sessionId, {
-        scopes,
-        reason: reason || "User updated granular consent preferences.",
-        aiProvider: aiProvider || (ai ? "local" : "none"),
-        expiry: expiry || null,
-        status: Object.values(scopes).some(Boolean) ? "granted" : "revoked",
-      })
-    : updateConsentFromLegacy(sessionId, {
-        ai,
-        tools,
-        reason: reason || "User updated AI/tool consent preferences.",
-        aiProvider: aiProvider || (ai ? "local" : "none"),
-        expiry: expiry || null,
-      });
-  recordAuditEvent(sessionId, "consent.updated", "Consent settings were updated.", {
-    ai,
-    tools,
-    activeScopes: versionedConsent.activeScopes,
-  });
+  const versionedConsent =
+    scopes && typeof scopes === "object"
+      ? setConsentState(sessionId, {
+          scopes,
+          reason: reason || "User updated granular consent preferences.",
+          aiProvider: aiProvider || (ai ? "local" : "none"),
+          expiry: expiry || null,
+          status: Object.values(scopes).some(Boolean) ? "granted" : "revoked",
+        })
+      : updateConsentFromLegacy(sessionId, {
+          ai,
+          tools,
+          reason: reason || "User updated AI/tool consent preferences.",
+          aiProvider: aiProvider || (ai ? "local" : "none"),
+          expiry: expiry || null,
+        });
+  recordAuditEvent(
+    sessionId,
+    "consent.updated",
+    "Consent settings were updated.",
+    {
+      ai,
+      tools,
+      activeScopes: versionedConsent.activeScopes,
+    },
+  );
 
   res.json({
     success: true,
@@ -1855,6 +2086,7 @@ app.get("/api/health", (req, res) => {
     onlineApiConfigured: Boolean(MISTRAL_API_KEY),
     onlineModel: MISTRAL_MODEL,
     supportsRequestedOnlineMode: !OFFLINE_MODE,
+    governanceFlags: GOVERNANCE_FLAGS,
     timestamp: new Date().toISOString(),
   });
 });
@@ -1877,7 +2109,8 @@ app.get("/api/session", csrfProtection, (req, res) => {
   updateConsentFromLegacy(newSessionId, {
     ai: false,
     tools: false,
-    reason: "Initialized versioned consent dashboard with all scopes off by default.",
+    reason:
+      "Initialized versioned consent dashboard with all scopes off by default.",
     aiProvider: "none",
   });
   return res.json({
@@ -1921,12 +2154,23 @@ app.get("/api/human-rights/report", requireAuth, (req, res) => {
 
 app.post("/api/data-export", csrfProtection, requireAuth, async (req, res) => {
   const sessionId = getSessionIdFromRequest(req);
-  recordAuditEvent(sessionId, "data.exported", "User exported current-session transparency data.", {
-    page: req.body?.page || null,
-  });
-  const exportPackage = buildExportPackage(sessionId, buildHumanRightsReport(sessionId));
+  recordAuditEvent(
+    sessionId,
+    "data.exported",
+    "User exported current-session transparency data.",
+    {
+      page: req.body?.page || null,
+    },
+  );
+  const exportPackage = buildExportPackage(
+    sessionId,
+    buildHumanRightsReport(sessionId),
+  );
   try {
-    await recordExport({ context: "human_rights_export", page: req.body?.page || "dashboard" });
+    await recordExport({
+      context: "human_rights_export",
+      page: req.body?.page || "dashboard",
+    });
   } catch {
     // Export remains available even when the optional ledger is unavailable.
   }
@@ -1967,7 +2211,9 @@ app.get("/api/ledger/status", (req, res) => {
       verificationStatus: "not-run",
     });
   } catch (err) {
-    res.status(500).json({ error: "Could not read ledger status.", details: err.message });
+    res
+      .status(500)
+      .json({ error: "Could not read ledger status.", details: err.message });
   }
 });
 
@@ -1980,7 +2226,9 @@ app.get("/api/ledger/history", (req, res) => {
     const receipts = getConsentHistory();
     res.json({ receipts, total: receipts.length });
   } catch (err) {
-    res.status(500).json({ error: "Could not read ledger history.", details: err.message });
+    res
+      .status(500)
+      .json({ error: "Could not read ledger history.", details: err.message });
   }
 });
 
@@ -2017,7 +2265,11 @@ app.get("/api/ledger/verify", (req, res) => {
 
     for (const receipt of receipts) {
       const result = verifyConsent(receipt);
-      if (result.valid) { verified++; } else { invalid++; }
+      if (result.valid) {
+        verified++;
+      } else {
+        invalid++;
+      }
     }
 
     res.json({
@@ -2027,7 +2279,9 @@ app.get("/api/ledger/verify", (req, res) => {
       allValid: invalid === 0,
     });
   } catch (err) {
-    res.status(500).json({ error: "Verification failed.", details: err.message });
+    res
+      .status(500)
+      .json({ error: "Verification failed.", details: err.message });
   }
 });
 
@@ -2035,80 +2289,132 @@ app.get("/api/ledger/verify", (req, res) => {
  * POST /api/ledger/consent
  * Record a consent-granted event.
  */
-app.post("/api/ledger/consent", csrfProtection, requireAuth, async (req, res) => {
-  try {
-    const { policyVersion, consentText } = req.body || {};
-    const receipt = await recordConsent({ policyVersion, consentText });
-    res.json({ success: true, receipt });
-  } catch (err) {
-    res.status(500).json({ error: "Could not record consent.", details: err.message });
-  }
-});
+app.post(
+  "/api/ledger/consent",
+  csrfProtection,
+  requireAuth,
+  requireFeatureConsent("blockchain"),
+  async (req, res) => {
+    try {
+      const { policyVersion, consentText } = req.body || {};
+      const receipt = await recordConsent({ policyVersion, consentText });
+      res.json({ success: true, receipt });
+    } catch (err) {
+      res
+        .status(500)
+        .json({ error: "Could not record consent.", details: err.message });
+    }
+  },
+);
 
 /**
  * POST /api/ledger/revoke
  * Record a consent-revoked event.
  */
-app.post("/api/ledger/revoke", csrfProtection, requireAuth, async (req, res) => {
-  try {
-    const receipt = await revokeConsent(req.body || {});
-    res.json({ success: true, receipt });
-  } catch (err) {
-    res.status(500).json({ error: "Could not revoke consent.", details: err.message });
-  }
-});
+app.post(
+  "/api/ledger/revoke",
+  csrfProtection,
+  requireAuth,
+  requireFeatureConsent("blockchain"),
+  async (req, res) => {
+    try {
+      const receipt = await revokeConsent(req.body || {});
+      res.json({ success: true, receipt });
+    } catch (err) {
+      res
+        .status(500)
+        .json({ error: "Could not revoke consent.", details: err.message });
+    }
+  },
+);
 
 /**
  * POST /api/ledger/record-export
  * Record that a data export was performed.
  */
-app.post("/api/ledger/record-export", csrfProtection, requireAuth, async (req, res) => {
-  try {
-    const receipt = await recordExport(req.body || {});
-    res.json({ success: true, receipt });
-  } catch (err) {
-    res.status(500).json({ error: "Could not record export.", details: err.message });
-  }
-});
+app.post(
+  "/api/ledger/record-export",
+  csrfProtection,
+  requireAuth,
+  requireFeatureConsent("blockchain"),
+  async (req, res) => {
+    try {
+      const receipt = await recordExport(req.body || {});
+      res.json({ success: true, receipt });
+    } catch (err) {
+      res
+        .status(500)
+        .json({ error: "Could not record export.", details: err.message });
+    }
+  },
+);
 
 /**
  * POST /api/ledger/record-deletion
  * Record that local data was deleted.
  */
-app.post("/api/ledger/record-deletion", csrfProtection, requireAuth, async (req, res) => {
-  try {
-    const receipt = await recordDeletion(req.body || {});
-    res.json({ success: true, receipt });
-  } catch (err) {
-    res.status(500).json({ error: "Could not record deletion.", details: err.message });
-  }
-});
+app.post(
+  "/api/ledger/record-deletion",
+  csrfProtection,
+  requireAuth,
+  requireFeatureConsent("blockchain"),
+  async (req, res) => {
+    try {
+      const receipt = await recordDeletion(req.body || {});
+      res.json({ success: true, receipt });
+    } catch (err) {
+      res
+        .status(500)
+        .json({ error: "Could not record deletion.", details: err.message });
+    }
+  },
+);
 
 /**
  * POST /api/ledger/policy-acceptance
  * Record that the user accepted a specific policy version.
  */
-app.post("/api/ledger/policy-acceptance", csrfProtection, requireAuth, async (req, res) => {
-  try {
-    const { policyVersion, policyDocumentText } = req.body || {};
-    if (!policyVersion) {
-      return res.status(400).json({ error: "policyVersion is required." });
+app.post(
+  "/api/ledger/policy-acceptance",
+  csrfProtection,
+  requireAuth,
+  requireFeatureConsent("blockchain"),
+  async (req, res) => {
+    try {
+      const { policyVersion, policyDocumentText } = req.body || {};
+      if (!policyVersion) {
+        return res.status(400).json({ error: "policyVersion is required." });
+      }
+      const receipt = await recordPolicyAcceptance(
+        policyVersion,
+        policyDocumentText,
+      );
+      res.json({ success: true, receipt });
+    } catch (err) {
+      res
+        .status(500)
+        .json({
+          error: "Could not record policy acceptance.",
+          details: err.message,
+        });
     }
-    const receipt = await recordPolicyAcceptance(policyVersion, policyDocumentText);
-    res.json({ success: true, receipt });
-  } catch (err) {
-    res.status(500).json({ error: "Could not record policy acceptance.", details: err.message });
-  }
-});
+  },
+);
 
 /**
  * POST /api/ledger/wallet/disconnect
  * Disconnect the current wallet and clear key material from memory.
  */
-app.post("/api/ledger/wallet/disconnect", csrfProtection, requireAuth, (req, res) => {
-  const disconnected = disconnectWallet();
-  res.json({ success: true, disconnected });
-});
+app.post(
+  "/api/ledger/wallet/disconnect",
+  csrfProtection,
+  requireAuth,
+  requireFeatureConsent("blockchain"),
+  (req, res) => {
+    const disconnected = disconnectWallet();
+    res.json({ success: true, disconnected });
+  },
+);
 
 /**
  * POST /api/ledger/blockchain/disable
@@ -2116,21 +2422,30 @@ app.post("/api/ledger/wallet/disconnect", csrfProtection, requireAuth, (req, res
  * On-chain records (if any) are immutable and unaffected.
  * Local ledger is cleared.
  */
-app.post("/api/ledger/blockchain/disable", csrfProtection, requireAuth, async (req, res) => {
-  try {
-    // Record a BLOCKCHAIN_DISABLED event before clearing
-    await revokeConsent({ context: "blockchain_disabled" });
-    disconnectWallet();
-    const cleared = clearLocalLedger();
-    res.json({
-      success: true,
-      message: "Blockchain disabled. Local ledger cleared. Wallet disconnected.",
-      recordsCleared: cleared,
-    });
-  } catch (err) {
-    res.status(500).json({ error: "Could not disable blockchain.", details: err.message });
-  }
-});
+app.post(
+  "/api/ledger/blockchain/disable",
+  csrfProtection,
+  requireAuth,
+  requireFeatureConsent("blockchain"),
+  async (req, res) => {
+    try {
+      // Record a BLOCKCHAIN_DISABLED event before clearing
+      await revokeConsent({ context: "blockchain_disabled" });
+      disconnectWallet();
+      const cleared = clearLocalLedger();
+      res.json({
+        success: true,
+        message:
+          "Blockchain disabled. Local ledger cleared. Wallet disconnected.",
+        recordsCleared: cleared,
+      });
+    } catch (err) {
+      res
+        .status(500)
+        .json({ error: "Could not disable blockchain.", details: err.message });
+    }
+  },
+);
 
 /**
  * Start server

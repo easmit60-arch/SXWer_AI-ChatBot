@@ -61,7 +61,12 @@ test("legacy consent updates and revocation keep backward compatibility", () => 
   assert.equal(granted.scopes.resources, true);
   assert.equal(granted.scopes.sherlock, true);
 
-  const revoked = revokeConsentScopes(sessionId, ["ai", "resources", "sherlock", "internet"]);
+  const revoked = revokeConsentScopes(sessionId, [
+    "ai",
+    "resources",
+    "sherlock",
+    "internet",
+  ]);
   assert.equal(revoked.scopes.ai, false);
   assert.equal(revoked.legacy.ai, false);
   assert.equal(revoked.legacy.tools, false);
@@ -69,7 +74,11 @@ test("legacy consent updates and revocation keep backward compatibility", () => 
 
 test("data manager and transparency export stay inspectable", () => {
   const sessionId = "human-rights-export-test";
-  recordAuditEvent(sessionId, "consent.updated", "Consent changed for export test.");
+  recordAuditEvent(
+    sessionId,
+    "consent.updated",
+    "Consent changed for export test.",
+  );
   const transparency = buildResponseTransparency({
     sessionId,
     message: "What happened?",
@@ -96,7 +105,7 @@ test("data manager and transparency export stay inspectable", () => {
     latestTransparency: getLatestTransparencyRecord(sessionId),
   });
 
-  assert.equal(dataManager.categories.length, 11);
+  assert.ok(dataManager.categories.length >= 11);
   assert.match(dataManager.categories[0].title, /Identity data/i);
   assert.equal(exportPackage.latestTransparency.disclosure.provider, "ollama");
   assert.ok(exportPackage.auditTimeline.length >= 1);

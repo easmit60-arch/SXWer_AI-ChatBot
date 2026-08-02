@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Data transparency dashboard for SXWer AI ChatBot"
+    />
+    <title>Data Dashboard - SXWer AI</title>
+    <link rel="stylesheet" href="/public/human-rights-dashboard.css" />
+  </head>
+  <body data-page="data-dashboard">
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+    <header>
+      <p><a href="/">Back to chat</a></p>
+      <h1>Data Dashboard</h1>
+      <p>
+        Inspect what data exists, why it exists, where it is stored, and how to
+        export or delete it.
+      </p>
+      <nav id="dashboard-nav" aria-label="Human rights dashboards"></nav>
+    </header>
+    <main id="main-content">
+      <p id="action-status" role="status" aria-live="polite" class="notice">
+        Preparing dashboard...
+      </p>
+      <div id="dashboard-root"></div>
+    </main>
+    <footer>
+      <p>SXWer AI - local-first, consent-driven, human-rights by design.</p>
+    </footer>
+    <script type="module" src="/public/human-rights-dashboard.js"></script>
+  </body>
+</html>

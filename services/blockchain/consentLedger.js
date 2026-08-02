@@ -39,16 +39,29 @@
  *  - The consent document text itself
  */
 
-import crypto from 'crypto';
+import crypto from "crypto";
 import {
   BLOCKCHAIN_ENABLED,
   CONSENT_EVENT_TYPES,
   LEDGER_SCHEMA_VERSION,
   INFORMED_CONSENT_DISCLOSURE,
-} from './ledgerConfig.js';
-import { hashConsentDocument, hashConsentReceipt, generateNonce } from './hashService.js';
-import { submitTransaction, getAllTransactions } from './blockchainService.js';
-import { getWalletId, isWalletConnected, signReceipt } from './walletService.js';
+} from "./ledgerConfig.js";
+import {
+  assertBlockchainPolicyCompliant,
+  sanitizeBlockchainDocument,
+  sanitizeBlockchainRecord,
+} from "../../blockchain/blockchainPolicy.js";
+import {
+  hashConsentDocument,
+  hashConsentReceipt,
+  generateNonce,
+} from "./hashService.js";
+import { submitTransaction, getAllTransactions } from "./blockchainService.js";
+import {
+  getWalletId,
+  isWalletConnected,
+  signReceipt,
+} from "./walletService.js";
 
 // ============================================================================
 // LOCAL LEDGER (in-memory mirror for fast querying without blockchain round-trips)
@@ -83,26 +96,34 @@ async function _buildAndSubmitReceipt(eventType, consentDocument, meta = {}) {
     throw new TypeError(`[LEDGER] Unknown event type: "${eventType}".`);
   }
 
-  const receiptId = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
+  const sanitizedDocument = sanitizeBlockchainDocument(consentDocument);
+  assertBlockchainPolicyCompliant({}, sanitizedDocument);
+
+  const receiptId = crypto.randomUUID
+    ? crypto.randomUUID()
+    : crypto.randomBytes(16).toString("hex");
   const timestamp = Date.now();
-  const documentHash = hashConsentDocument(consentDocument);
+  const documentHash = hashConsentDocument(sanitizedDocument);
   const nonce = generateNonce();
 
   // Assemble the receipt (no PII — see module-level comment)
   const receipt = {
     receiptId,
     schemaVersion: LEDGER_SCHEMA_VERSION,
-    appVersion: meta.appVersion || process.env.npm_package_version || 'unknown',
+    appVersion: meta.appVersion || process.env.npm_package_version || "unknown",
     eventType,
     documentHash,
-    policyVersion: meta.policyVersion || INFORMED_CONSENT_DISCLOSURE.policyVersion,
+    policyVersion:
+      meta.policyVersion || INFORMED_CONSENT_DISCLOSURE.policyVersion,
     timestamp,
     nonce,
     walletId: isWalletConnected() ? getWalletId() : null,
-    txId: null,       // Filled in after blockchain submission
-    signature: null,  // Filled in after signing
-    receiptHash: null,// Filled in after building final receipt
+    txId: null, // Filled in after blockchain submission
+    signature: null, // Filled in after signing
+    receiptHash: null, // Filled in after building final receipt
   };
+
+  assertBlockchainPolicyCompliant(receipt, sanitizedDocument);
 
   // Compute receipt hash (covers all fields except receiptHash and signature)
   const { receiptHash: _rh, signature: _sig, ...hashable } = receipt;
@@ -113,12 +134,17 @@ async function _buildAndSubmitReceipt(eventType, consentDocument, meta = {}) {
     try {
       receipt.signature = signReceipt(receipt.receiptHash);
     } catch (err) {
-      console.warn(`[LEDGER] Wallet signing failed: ${err.message}. Continuing without signature.`);
+      console.warn(
+        `[LEDGER] Wallet signing failed: ${err.message}. Continuing without signature.`,
+      );
     }
   }
 
   // Write to local ledger first (synchronous, always succeeds)
-  _localLedger.set(receiptId, { ...receipt, onChain: false });
+  _localLedger.set(receiptId, {
+    ...sanitizeBlockchainRecord(receipt),
+    onChain: false,
+  });
 
   // Optionally submit to blockchain (async, may fail without breaking the app)
   if (BLOCKCHAIN_ENABLED) {
@@ -127,11 +153,21 @@ async function _buildAndSubmitReceipt(eventType, consentDocument, meta = {}) {
       if (txResult) {
         receipt.txId = txResult.txId;
         // Update local ledger with transaction result
-        _localLedger.set(receiptId, { ...receipt, onChain: true, txResult });
+        _localLedger.set(receiptId, {
+          ...sanitizeBlockchainRecord(receipt),
+          onChain: true,
+          txResult,
+        });
       }
     } catch (err) {
-      console.warn(`[LEDGER] Blockchain submission failed: ${err.message}. Receipt retained locally.`);
-      _localLedger.set(receiptId, { ...receipt, onChain: false, submissionError: err.message });
+      console.warn(
+        `[LEDGER] Blockchain submission failed: ${err.message}. Receipt retained locally.`,
+      );
+      _localLedger.set(receiptId, {
+        ...sanitizeBlockchainRecord(receipt),
+        onChain: false,
+        submissionError: err.message,
+      });
     }
   }
 
@@ -153,8 +189,9 @@ async function _buildAndSubmitReceipt(eventType, consentDocument, meta = {}) {
  */
 async function recordConsent(options = {}) {
   const document = {
-    action: 'consent_granted',
-    policyVersion: options.policyVersion || INFORMED_CONSENT_DISCLOSURE.policyVersion,
+    action: "consent_granted",
+    policyVersion:
+      options.policyVersion || INFORMED_CONSENT_DISCLOSURE.policyVersion,
     consentTextHash: options.consentText
       ? hashConsentDocument(options.consentText)
       : hashConsentDocument(INFORMED_CONSENT_DISCLOSURE.body),
@@ -164,7 +201,7 @@ async function recordConsent(options = {}) {
   const receipt = await _buildAndSubmitReceipt(
     CONSENT_EVENT_TYPES.CONSENT_GRANTED,
     document,
-    options
+    options,
   );
 
   console.log(`[LEDGER] Consent granted. receiptId=${receipt.receiptId}`);
@@ -180,8 +217,9 @@ async function recordConsent(options = {}) {
  */
 async function revokeConsent(options = {}) {
   const document = {
-    action: 'consent_revoked',
-    policyVersion: options.policyVersion || INFORMED_CONSENT_DISCLOSURE.policyVersion,
+    action: "consent_revoked",
+    policyVersion:
+      options.policyVersion || INFORMED_CONSENT_DISCLOSURE.policyVersion,
     timestamp: Date.now(),
     // reason is NOT included — it may contain sensitive language
   };
@@ -189,7 +227,7 @@ async function revokeConsent(options = {}) {
   const receipt = await _buildAndSubmitReceipt(
     CONSENT_EVENT_TYPES.CONSENT_REVOKED,
     document,
-    options
+    options,
   );
 
   console.log(`[LEDGER] Consent revoked. receiptId=${receipt.receiptId}`);
@@ -204,11 +242,18 @@ async function revokeConsent(options = {}) {
  * @returns {{ valid: boolean, reason: string }}
  */
 function verifyConsent(receipt) {
-  if (!receipt || typeof receipt !== 'object') {
-    return { valid: false, reason: 'Receipt is missing or not an object.' };
+  if (!receipt || typeof receipt !== "object") {
+    return { valid: false, reason: "Receipt is missing or not an object." };
   }
 
-  const required = ['receiptId', 'eventType', 'documentHash', 'receiptHash', 'timestamp', 'nonce'];
+  const required = [
+    "receiptId",
+    "eventType",
+    "documentHash",
+    "receiptHash",
+    "timestamp",
+    "nonce",
+  ];
   for (const field of required) {
     if (!receipt[field]) {
       return { valid: false, reason: `Required field "${field}" is missing.` };
@@ -216,17 +261,25 @@ function verifyConsent(receipt) {
   }
 
   // Re-compute the receipt hash and compare
-  const { receiptHash, signature, onChain, txResult, submissionError, ...hashable } = receipt;
+  const {
+    receiptHash,
+    signature,
+    onChain,
+    txResult,
+    submissionError,
+    ...hashable
+  } = receipt;
   const computed = hashConsentReceipt(hashable);
 
   if (computed !== receiptHash) {
     return {
       valid: false,
-      reason: 'Receipt hash does not match. The receipt may have been tampered with.',
+      reason:
+        "Receipt hash does not match. The receipt may have been tampered with.",
     };
   }
 
-  return { valid: true, reason: 'Receipt integrity verified.' };
+  return { valid: true, reason: "Receipt integrity verified." };
 }
 
 /**
@@ -237,12 +290,12 @@ function verifyConsent(receipt) {
  * @returns {Promise<Object>} Policy acceptance receipt
  */
 async function recordPolicyAcceptance(policyVersion, policyDocumentText) {
-  if (!policyVersion || typeof policyVersion !== 'string') {
-    throw new TypeError('[LEDGER] policyVersion must be a non-empty string.');
+  if (!policyVersion || typeof policyVersion !== "string") {
+    throw new TypeError("[LEDGER] policyVersion must be a non-empty string.");
   }
 
   const document = {
-    action: 'policy_version_accepted',
+    action: "policy_version_accepted",
     policyVersion,
     policyDocumentHash: policyDocumentText
       ? hashConsentDocument(policyDocumentText)
@@ -253,10 +306,12 @@ async function recordPolicyAcceptance(policyVersion, policyDocumentText) {
   const receipt = await _buildAndSubmitReceipt(
     CONSENT_EVENT_TYPES.POLICY_VERSION_ACCEPTED,
     document,
-    { policyVersion }
+    { policyVersion },
   );
 
-  console.log(`[LEDGER] Policy accepted. version=${policyVersion} receiptId=${receipt.receiptId}`);
+  console.log(
+    `[LEDGER] Policy accepted. version=${policyVersion} receiptId=${receipt.receiptId}`,
+  );
   return receipt;
 }
 
@@ -270,20 +325,22 @@ async function recordPolicyAcceptance(policyVersion, policyDocumentText) {
  */
 async function recordDeletion(options = {}) {
   const document = {
-    action: 'local_data_deleted',
+    action: "local_data_deleted",
     // dataTypes contains category labels only (e.g. ['consent', 'settings'])
     // It must NEVER contain actual data content
-    dataTypes: Array.isArray(options.dataTypes) ? options.dataTypes : ['all'],
+    dataTypes: Array.isArray(options.dataTypes) ? options.dataTypes : ["all"],
     timestamp: Date.now(),
   };
 
   const receipt = await _buildAndSubmitReceipt(
     CONSENT_EVENT_TYPES.LOCAL_DATA_DELETED,
     document,
-    options
+    options,
   );
 
-  console.log(`[LEDGER] Data deletion recorded. receiptId=${receipt.receiptId}`);
+  console.log(
+    `[LEDGER] Data deletion recorded. receiptId=${receipt.receiptId}`,
+  );
   return receipt;
 }
 
@@ -297,15 +354,15 @@ async function recordDeletion(options = {}) {
  */
 async function recordExport(options = {}) {
   const document = {
-    action: 'data_export_completed',
-    exportFormat: options.exportFormat || 'json',
+    action: "data_export_completed",
+    exportFormat: options.exportFormat || "json",
     timestamp: Date.now(),
   };
 
   const receipt = await _buildAndSubmitReceipt(
     CONSENT_EVENT_TYPES.DATA_EXPORT_COMPLETED,
     document,
-    options
+    options,
   );
 
   console.log(`[LEDGER] Data export recorded. receiptId=${receipt.receiptId}`);
@@ -319,8 +376,12 @@ async function recordExport(options = {}) {
  * @returns {Promise<Object>} AI-enabled receipt
  */
 async function recordAIEnabled(options = {}) {
-  const document = { action: 'ai_enabled', timestamp: Date.now() };
-  return _buildAndSubmitReceipt(CONSENT_EVENT_TYPES.AI_ENABLED, document, options);
+  const document = { action: "ai_enabled", timestamp: Date.now() };
+  return _buildAndSubmitReceipt(
+    CONSENT_EVENT_TYPES.AI_ENABLED,
+    document,
+    options,
+  );
 }
 
 /**
@@ -330,8 +391,12 @@ async function recordAIEnabled(options = {}) {
  * @returns {Promise<Object>} AI-disabled receipt
  */
 async function recordAIDisabled(options = {}) {
-  const document = { action: 'ai_disabled', timestamp: Date.now() };
-  return _buildAndSubmitReceipt(CONSENT_EVENT_TYPES.AI_DISABLED, document, options);
+  const document = { action: "ai_disabled", timestamp: Date.now() };
+  return _buildAndSubmitReceipt(
+    CONSENT_EVENT_TYPES.AI_DISABLED,
+    document,
+    options,
+  );
 }
 
 /**
@@ -341,13 +406,20 @@ async function recordAIDisabled(options = {}) {
  * @param {Object} [options={}]
  * @returns {Promise<Object>} Permission receipt
  */
-async function recordThirdPartyPermissionGranted(permissionScope, options = {}) {
+async function recordThirdPartyPermissionGranted(
+  permissionScope,
+  options = {},
+) {
   const document = {
-    action: 'third_party_permission_granted',
-    permissionScope: permissionScope || 'unknown',
+    action: "third_party_permission_granted",
+    permissionScope: permissionScope || "unknown",
     timestamp: Date.now(),
   };
-  return _buildAndSubmitReceipt(CONSENT_EVENT_TYPES.THIRD_PARTY_PERMISSION_GRANTED, document, options);
+  return _buildAndSubmitReceipt(
+    CONSENT_EVENT_TYPES.THIRD_PARTY_PERMISSION_GRANTED,
+    document,
+    options,
+  );
 }
 
 /**
@@ -357,13 +429,20 @@ async function recordThirdPartyPermissionGranted(permissionScope, options = {}) 
  * @param {Object} [options={}]
  * @returns {Promise<Object>} Revocation receipt
  */
-async function recordThirdPartyPermissionRevoked(permissionScope, options = {}) {
+async function recordThirdPartyPermissionRevoked(
+  permissionScope,
+  options = {},
+) {
   const document = {
-    action: 'third_party_permission_revoked',
-    permissionScope: permissionScope || 'unknown',
+    action: "third_party_permission_revoked",
+    permissionScope: permissionScope || "unknown",
     timestamp: Date.now(),
   };
-  return _buildAndSubmitReceipt(CONSENT_EVENT_TYPES.THIRD_PARTY_PERMISSION_REVOKED, document, options);
+  return _buildAndSubmitReceipt(
+    CONSENT_EVENT_TYPES.THIRD_PARTY_PERMISSION_REVOKED,
+    document,
+    options,
+  );
 }
 
 // ============================================================================
@@ -376,8 +455,9 @@ async function recordThirdPartyPermissionRevoked(permissionScope, options = {}) 
  * @returns {Object[]} Array of receipt objects, newest first
  */
 function getConsentHistory() {
-  return Array.from(_localLedger.values())
-    .sort((a, b) => b.timestamp - a.timestamp);
+  return Array.from(_localLedger.values()).sort(
+    (a, b) => b.timestamp - a.timestamp,
+  );
 }
 
 /**
@@ -421,10 +501,10 @@ function exportLedger() {
     totalRecords: _localLedger.size,
     receipts: getConsentHistory(),
     disclaimer: [
-      'This export contains cryptographic consent receipts only.',
-      'It contains no personally identifiable information.',
-      'Hashes are SHA-256 fingerprints of consent documents — not the documents themselves.',
-    ].join(' '),
+      "This export contains cryptographic consent receipts only.",
+      "It contains no personally identifiable information.",
+      "Hashes are SHA-256 fingerprints of consent documents — not the documents themselves.",
+    ].join(" "),
   });
 }
 
@@ -450,11 +530,15 @@ function clearLocalLedger() {
 function getConsentStatus() {
   const granted = getLatestConsentEvent(CONSENT_EVENT_TYPES.CONSENT_GRANTED);
   const revoked = getLatestConsentEvent(CONSENT_EVENT_TYPES.CONSENT_REVOKED);
-  const policy  = getLatestConsentEvent(CONSENT_EVENT_TYPES.POLICY_VERSION_ACCEPTED);
-  const exports = Array.from(_localLedger.values())
-    .filter((r) => r.eventType === CONSENT_EVENT_TYPES.DATA_EXPORT_COMPLETED);
-  const deletions = Array.from(_localLedger.values())
-    .filter((r) => r.eventType === CONSENT_EVENT_TYPES.LOCAL_DATA_DELETED);
+  const policy = getLatestConsentEvent(
+    CONSENT_EVENT_TYPES.POLICY_VERSION_ACCEPTED,
+  );
+  const exports = Array.from(_localLedger.values()).filter(
+    (r) => r.eventType === CONSENT_EVENT_TYPES.DATA_EXPORT_COMPLETED,
+  );
+  const deletions = Array.from(_localLedger.values()).filter(
+    (r) => r.eventType === CONSENT_EVENT_TYPES.LOCAL_DATA_DELETED,
+  );
 
   return Object.freeze({
     blockchainEnabled: BLOCKCHAIN_ENABLED,
@@ -464,13 +548,13 @@ function getConsentStatus() {
     policyVersion: policy ? policy.policyVersion : null,
     policyAcceptedAt: policy ? policy.timestamp : null,
     exportCount: exports.length,
-    lastExportAt: exports.length > 0
-      ? Math.max(...exports.map((r) => r.timestamp))
-      : null,
+    lastExportAt:
+      exports.length > 0 ? Math.max(...exports.map((r) => r.timestamp)) : null,
     deletionCount: deletions.length,
-    lastDeletionAt: deletions.length > 0
-      ? Math.max(...deletions.map((r) => r.timestamp))
-      : null,
+    lastDeletionAt:
+      deletions.length > 0
+        ? Math.max(...deletions.map((r) => r.timestamp))
+        : null,
     totalLedgerRecords: _localLedger.size,
   });
 }

@@ -1,4 +1,6 @@
 const transparencyStore = new Map();
+const ALLOW_PROMPTS =
+  String(process.env.ALLOW_PROMPTS || "false").toLowerCase() === "true";
 
 function normalizeSessionId(sessionId = "default") {
   const normalized = String(sessionId || "default").trim();
@@ -42,7 +44,9 @@ function buildResponseTransparency({
     sources: Object.freeze(
       aiUsed
         ? [
-            mode === "online" ? "Configured online AI provider" : "Configured local AI provider",
+            mode === "online"
+              ? "Configured online AI provider"
+              : "Configured local AI provider",
             "Built-in safety validator",
             "Consent and human-rights gates",
           ]
@@ -64,7 +68,9 @@ function buildResponseTransparency({
       (aiUsed
         ? "The app used the selected AI path only after consent and then wrapped the reply in transparency and safety disclosures."
         : "The app answered with local-first logic because AI was unavailable, refused, or unnecessary."),
-    limitations: Object.freeze([...(limitations || []), explanation?.limitations].filter(Boolean)),
+    limitations: Object.freeze(
+      [...(limitations || []), explanation?.limitations].filter(Boolean),
+    ),
   });
 
   const rights = Object.freeze(
@@ -97,7 +103,9 @@ function buildResponseTransparency({
   const record = Object.freeze({
     sessionId: normalizeSessionId(sessionId),
     createdAt: new Date().toISOString(),
-    promptPreview: String(message || "").slice(0, 160),
+    promptPreview: ALLOW_PROMPTS
+      ? String(message || "").slice(0, 160)
+      : "[redacted: ALLOW_PROMPTS=false]",
     disclosure,
     explain,
     rights,
