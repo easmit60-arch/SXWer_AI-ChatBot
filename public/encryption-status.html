@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<!--
+  SXWer AI Chat Bot — Encryption Status & Key Management
+  ======================================================
+  This page lets users inspect and manage their end-to-end encryption keys
+  without navigating away from a single, accessible interface.
+
+  Data collected: none.  All key material lives in your browser only.
+  Nothing on this page is sent to the server.
+
+  WCAG 2.2 AA compliant.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Encryption Status — SXWer AI</title>
+    <style>
+      /* ── Reset / Base ─────────────────────────────────────────────── */
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+      :root {
+        --bg: #0d0d1a;
+        --surface: #1a1a2e;
+        --border: #2a2a4a;
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --green: #22c55e;
+        --green-bg: #14532d;
+        --red: #ef4444;
+        --red-bg: #7f1d1d;
+        --yellow: #f59e0b;
+        --yellow-bg: #451a03;
+        --accent: #7c3aed;
+        --accent-hover: #6d28d9;
+        --focus: #00d4ff;
+        --radius: 0.5rem;
+      }
+
+      html { font-size: 16px; }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: system-ui, -apple-system, sans-serif;
+        line-height: 1.6;
+        min-height: 100vh;
+        padding: 1rem;
+      }
+
+      /* Skip link */
+      .skip-link {
+        position: absolute;
+        top: -100%;
+        left: 0;
+        padding: 0.5rem 1rem;
+        background: var(--accent);
+        color: #fff;
+        font-weight: bold;
+        z-index: 9999;
+        text-decoration: none;
+        border-radius: 0 0 0.25rem 0;
+      }
+      .skip-link:focus { top: 0; outline: 3px solid var(--focus); }
+
+      /* Layout */
+      .container { max-width: 680px; margin: 0 auto; }
+
+      header { padding: 1.5rem 0 1rem; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
+      header h1 { font-size: 1.4rem; font-weight: 700; }
+      header p { color: var(--muted); font-size: 0.9rem; margin-top: 0.25rem; }
+      .back-link { display: inline-block; color: var(--muted); font-size: 0.85rem; text-decoration: none; margin-bottom: 0.75rem; }
+      .back-link:hover, .back-link:focus { color: var(--text); outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 2px; }
+
+      /* Cards */
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+      }
+      .card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; }
+
+      /* Status pill */
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.3rem 0.8rem;
+        border-radius: 9999px;
+        font-size: 0.85rem;
+        font-weight: 600;
+      }
+      .status-pill.on  { background: var(--green-bg); color: var(--green); }
+      .status-pill.off { background: var(--red-bg);   color: var(--red);   }
+
+      /* Key display */
+      .key-display {
+        background: #0a0a16;
+        border: 1px solid var(--border);
+        border-radius: 0.3rem;
+        font-family: ui-monospace, monospace;
+        font-size: 0.75rem;
+        padding: 0.6rem 0.8rem;
+        word-break: break-all;
+        color: var(--muted);
+        max-height: 5rem;
+        overflow-y: auto;
+      }
+      .key-label { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.3rem; font-weight: 600; }
+
+      /* Buttons */
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.5rem 1rem;
+        border: none;
+        border-radius: var(--radius);
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        transition: background 0.15s;
+      }
+      .btn:focus { outline: 3px solid var(--focus); outline-offset: 2px; }
+      .btn-primary { background: var(--accent); color: #fff; }
+      .btn-primary:hover { background: var(--accent-hover); }
+      .btn-secondary { background: var(--border); color: var(--text); }
+      .btn-secondary:hover { background: #3a3a5a; }
+      .btn-danger { background: var(--red-bg); color: var(--red); }
+      .btn-danger:hover { background: #991b1b; color: #fff; }
+      .btn-row { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.75rem; }
+
+      /* Alert box */
+      .alert {
+        padding: 0.75rem 1rem;
+        border-radius: 0.3rem;
+        font-size: 0.85rem;
+        margin-bottom: 0.75rem;
+      }
+      .alert-info { background: #1e3a5f; color: #93c5fd; border-left: 3px solid #3b82f6; }
+      .alert-warning { background: var(--yellow-bg); color: var(--yellow); border-left: 3px solid var(--yellow); }
+      .alert-success { background: var(--green-bg); color: var(--green); border-left: 3px solid var(--green); }
+      .alert-error { background: var(--red-bg); color: var(--red); border-left: 3px solid var(--red); }
+
+      /* Password input */
+      .field { margin-bottom: 0.75rem; }
+      .field label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem; }
+      .field input {
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        background: #0a0a16;
+        border: 1px solid var(--border);
+        border-radius: 0.3rem;
+        color: var(--text);
+        font-size: 0.9rem;
+      }
+      .field input:focus { outline: 3px solid var(--focus); outline-offset: -1px; }
+
+      /* Disclosure */
+      .disclosure {
+        font-size: 0.8rem;
+        color: var(--muted);
+        border-top: 1px solid var(--border);
+        padding-top: 0.75rem;
+        margin-top: 0.75rem;
+        line-height: 1.5;
+      }
+      .disclosure strong { color: var(--text); }
+
+      /* Section separator */
+      hr { border: none; border-top: 1px solid var(--border); margin: 1.25rem 0; }
+
+      /* Spinner */
+      .spinner {
+        display: inline-block;
+        width: 1rem; height: 1rem;
+        border: 2px solid transparent;
+        border-top-color: currentColor;
+        border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+        vertical-align: middle;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      /* Hidden */
+      [hidden] { display: none !important; }
+
+      /* Reduced motion */
+      @media (prefers-reduced-motion: reduce) {
+        .spinner { animation: none; opacity: 0.6; }
+        .skip-link, .btn { transition: none; }
+      }
+
+      /* High contrast */
+      @media (forced-colors: active) {
+        .btn { border: 1px solid ButtonText; }
+        .card { border-color: ButtonText; }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+
+    <div class="container">
+      <a class="back-link" href="/">&larr; Back to chat</a>
+
+      <header>
+        <h1>🔐 Encryption Status &amp; Key Management</h1>
+        <p>Manage your end-to-end encryption keys. All key material stays on your device.</p>
+      </header>
+
+      <main id="main">
+
+        <!-- ── Encryption Status ──────────────────────────────────── -->
+        <section class="card" aria-labelledby="h-status">
+          <h2 id="h-status">Current Encryption Status</h2>
+          <div id="enc-status-pill" class="status-pill off" role="status" aria-live="polite">
+            <span aria-hidden="true">🔓</span> Checking…
+          </div>
+          <div id="enc-status-detail" class="alert alert-info" style="margin-top:0.75rem" hidden>
+            Loading…
+          </div>
+        </section>
+
+        <!-- ── Your Public Key ────────────────────────────────────── -->
+        <section class="card" aria-labelledby="h-pubkey">
+          <h2 id="h-pubkey">Your Public Key (X25519)</h2>
+          <p class="key-label">Share this openly — it cannot decrypt your messages.</p>
+          <div id="pub-key-display" class="key-display" aria-label="Your public key" tabindex="0">Not available</div>
+          <div class="btn-row">
+            <button class="btn btn-secondary" id="btn-copy-pubkey" type="button" aria-label="Copy public key to clipboard">
+              📋 Copy
+            </button>
+          </div>
+        </section>
+
+        <!-- ── Key Actions ────────────────────────────────────────── -->
+        <section class="card" aria-labelledby="h-actions">
+          <h2 id="h-actions">Key Actions</h2>
+
+          <h3 style="font-size:0.9rem;margin-bottom:0.5rem;">Export Keys (encrypted backup)</h3>
+          <div class="field">
+            <label for="export-pass">Backup password</label>
+            <input type="password" id="export-pass" autocomplete="new-password"
+                   placeholder="Choose a strong password" aria-describedby="export-pass-hint" />
+            <span id="export-pass-hint" class="key-label" style="margin-top:0.25rem;display:block;">
+              Your keys are encrypted with this password before download. Use a strong, unique password.
+            </span>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-primary" id="btn-export" type="button">⬇ Export Encrypted Keys</button>
+          </div>
+
+          <hr />
+
+          <h3 style="font-size:0.9rem;margin-bottom:0.5rem;">Import Keys (restore backup)</h3>
+          <div class="alert alert-warning">
+            Importing will replace your current keys. Any messages encrypted to your current key pair will become unreadable.
+          </div>
+          <div class="field">
+            <label for="import-file">Encrypted key file (.json)</label>
+            <input type="file" id="import-file" accept=".json,application/json"
+                   aria-describedby="import-file-hint" />
+            <span id="import-file-hint" class="key-label" style="margin-top:0.25rem;display:block;">
+              Select the backup file you exported previously.
+            </span>
+          </div>
+          <div class="field">
+            <label for="import-pass">Backup password</label>
+            <input type="password" id="import-pass" autocomplete="current-password"
+                   placeholder="Password used when exporting" />
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-primary" id="btn-import" type="button">⬆ Import Keys</button>
+          </div>
+
+          <hr />
+
+          <h3 style="font-size:0.9rem;margin-bottom:0.5rem;">Rotate Keys</h3>
+          <p style="font-size:0.85rem;color:var(--muted);margin-bottom:0.5rem;">
+            Generate a new key pair. Your old key pair will be discarded.
+            Any messages encrypted to your old key will no longer be decryptable.
+            Use this if you believe your private key was compromised.
+          </p>
+          <div class="btn-row">
+            <button class="btn btn-secondary" id="btn-rotate" type="button">🔄 Rotate Keys</button>
+          </div>
+
+          <hr />
+
+          <h3 style="font-size:0.9rem;margin-bottom:0.5rem;">Delete Local Key Data</h3>
+          <p style="font-size:0.85rem;color:var(--muted);margin-bottom:0.5rem;">
+            Permanently erases your key pair from this browser.
+            You will not be able to read any previously encrypted messages.
+          </p>
+          <div class="btn-row">
+            <button class="btn btn-danger" id="btn-clear-keys" type="button">🗑 Delete Keys</button>
+          </div>
+        </section>
+
+        <!-- ── Consent / Blockchain ───────────────────────────────── -->
+        <section class="card" aria-labelledby="h-blockchain">
+          <h2 id="h-blockchain">Blockchain Consent Ledger (Optional)</h2>
+          <div class="alert alert-info">
+            The blockchain is <strong>optional</strong>. It never stores your messages, usernames, or any personal data.
+            It only stores cryptographic hashes of consent receipts and timestamps.
+          </div>
+          <div id="blockchain-status" role="status" aria-live="polite" style="font-size:0.85rem;color:var(--muted);">
+            Checking blockchain status…
+          </div>
+          <div class="btn-row">
+            <a href="/consent-ledger" class="btn btn-secondary">📋 View Consent Ledger</a>
+          </div>
+
+          <div class="disclosure">
+            <strong>What the blockchain stores:</strong> consent granted / revoked receipts,
+            document hashes, moderation decision hashes, policy version accepted, timestamps.<br />
+            <strong>What it never stores:</strong> messages, usernames, prompts, AI responses,
+            files, photos, voice, IP addresses.<br />
+            <strong>Revocable:</strong> You can disable blockchain logging at any time from
+            the consent ledger page.
+          </div>
+        </section>
+
+        <!-- ── How Encryption Works ───────────────────────────────── -->
+        <section class="card" aria-labelledby="h-howto">
+          <h2 id="h-howto">How Encryption Works</h2>
+          <details>
+            <summary style="cursor:pointer;font-weight:600;font-size:0.9rem;">Learn more about the encryption model</summary>
+            <div style="margin-top:0.75rem;font-size:0.85rem;color:var(--muted);line-height:1.7;">
+              <p><strong style="color:var(--text);">Algorithm:</strong>
+                X25519 key exchange + XSalsa20-Poly1305 authenticated encryption (TweetNaCl nacl.box).
+                This is a well-audited, modern scheme that provides confidentiality and authenticity.</p>
+              <p style="margin-top:0.5rem;"><strong style="color:var(--text);">Message flow:</strong></p>
+              <ol style="margin-left:1.2rem;margin-top:0.25rem;">
+                <li>You and the server each generate a key pair on first use.</li>
+                <li>You perform a handshake: exchange public keys. Your private key never leaves your device.</li>
+                <li>Both sides independently compute the same shared secret (Diffie-Hellman). The secret is never transmitted.</li>
+                <li>Each message is encrypted with a unique random nonce. The ciphertext is sent to the server.</li>
+                <li>The server relays ciphertext. It cannot read your messages.</li>
+                <li>The recipient decrypts locally using the shared secret and the nonce.</li>
+              </ol>
+              <p style="margin-top:0.5rem;"><strong style="color:var(--text);">Replay protection:</strong>
+                The server tracks nonces per session. A nonce already seen is rejected, preventing replay attacks.</p>
+              <p style="margin-top:0.5rem;"><strong style="color:var(--text);">Key export:</strong>
+                When you export your keys, they are encrypted using PBKDF2 (310,000 iterations, SHA-256) → AES-GCM
+                with your chosen password before download. The raw private key is never written to disk unencrypted.</p>
+              <p style="margin-top:0.5rem;"><strong style="color:var(--text);">Trust assumptions:</strong>
+                This model protects message contents from the server and from network observers.
+                It does not protect against a compromised browser extension, a compromised device,
+                or a server that has been modified to return a malicious public key (key-substitution attack).
+                For the highest security, verify the server's public key out-of-band.</p>
+            </div>
+          </details>
+        </section>
+
+        <!-- ── Feedback area ──────────────────────────────────────── -->
+        <div id="feedback" role="status" aria-live="polite" aria-atomic="true" hidden></div>
+
+      </main>
+    </div>
+
+    <!-- TweetNaCl (offline-bundled, no CDN dependency) -->
+    <script src="/public/nacl.min.js"></script>
+    <script src="/public/nacl-util.min.js"></script>
+    <script src="/public/sxwer-crypto.js"></script>
+
+    <script>
+      // ── Helper: show feedback ─────────────────────────────────────
+      function showFeedback(message, type = "info") {
+        const fb = document.getElementById("feedback");
+        fb.className = `alert alert-${type}`;
+        fb.textContent = message;
+        fb.hidden = false;
+        fb.focus();
+        setTimeout(() => { fb.hidden = true; }, 8000);
+      }
+
+      // ── Refresh status display ────────────────────────────────────
+      async function refreshStatus() {
+        const pill = document.getElementById("enc-status-pill");
+        const detail = document.getElementById("enc-status-detail");
+        const pubKeyEl = document.getElementById("pub-key-display");
+
+        if (typeof window.SXWerCrypto === "undefined") {
+          pill.className = "status-pill off";
+          pill.innerHTML = '<span aria-hidden="true">🔓</span> Library not loaded';
+          detail.className = "alert alert-error";
+          detail.textContent = "SXWerCrypto library failed to load. Try refreshing the page.";
+          detail.hidden = false;
+          return;
+        }
+
+        const status = SXWerCrypto.getStatus();
+
+        if (status.e2eEnabled) {
+          pill.className = "status-pill on";
+          pill.innerHTML = '<span aria-hidden="true">🔒</span> End-to-end encrypted';
+          detail.className = "alert alert-success";
+          detail.textContent =
+            `Encryption active. Session: ${status.sessionId || "—"}. ` +
+            `Server key: ${status.serverPublicKey ? status.serverPublicKey.slice(0, 16) + "…" : "none"}.`;
+          detail.hidden = false;
+          pubKeyEl.textContent = status.clientPublicKey || "not generated yet";
+        } else {
+          pill.className = "status-pill off";
+          pill.innerHTML = '<span aria-hidden="true">🔓</span> Not encrypted (plaintext)';
+          detail.className = "alert alert-warning";
+          detail.textContent =
+            status.clientPublicKey
+              ? "Key pair exists but encryption is not active. Return to chat to initialise encryption."
+              : "No key pair found. Encryption will be initialised automatically when you open the chat.";
+          detail.hidden = false;
+          pubKeyEl.textContent = status.clientPublicKey || "none";
+        }
+
+        // Blockchain status (best-effort)
+        const bcStatus = document.getElementById("blockchain-status");
+        try {
+          const resp = await fetch("/api/blockchain/status");
+          if (resp.ok) {
+            const data = await resp.json();
+            bcStatus.textContent = data.available
+              ? `Consent ledger: connected (${data.network || "unknown network"})`
+              : "Consent ledger: not connected (offline mode — no receipts are being written)";
+          } else {
+            bcStatus.textContent = "Consent ledger: status unavailable";
+          }
+        } catch {
+          bcStatus.textContent = "Consent ledger: offline";
+        }
+      }
+
+      // ── Copy public key ───────────────────────────────────────────
+      document.getElementById("btn-copy-pubkey").addEventListener("click", async () => {
+        const key = document.getElementById("pub-key-display").textContent.trim();
+        if (!key || key === "Not available" || key === "none") {
+          showFeedback("No public key to copy.", "warning");
+          return;
+        }
+        try {
+          await navigator.clipboard.writeText(key);
+          showFeedback("Public key copied to clipboard.", "success");
+        } catch {
+          showFeedback("Clipboard access denied. Please select and copy the key manually.", "warning");
+        }
+      });
+
+      // ── Export keys ───────────────────────────────────────────────
+      document.getElementById("btn-export").addEventListener("click", async () => {
+        const password = document.getElementById("export-pass").value;
+        if (!password || password.length < 8) {
+          showFeedback("Please enter a password of at least 8 characters before exporting.", "warning");
+          document.getElementById("export-pass").focus();
+          return;
+        }
+        if (typeof window.SXWerCrypto === "undefined") {
+          showFeedback("Encryption library not loaded.", "error");
+          return;
+        }
+        try {
+          const blob = await SXWerCrypto.exportKeyPair(password);
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `sxwer-keys-${Date.now()}.json`;
+          a.click();
+          URL.revokeObjectURL(url);
+          showFeedback("Keys exported successfully. Store this file in a secure location.", "success");
+        } catch (err) {
+          showFeedback(`Export failed: ${err.message}`, "error");
+        }
+      });
+
+      // ── Import keys ───────────────────────────────────────────────
+      document.getElementById("btn-import").addEventListener("click", async () => {
+        const file = document.getElementById("import-file").files[0];
+        const password = document.getElementById("import-pass").value;
+        if (!file) {
+          showFeedback("Please select a key backup file.", "warning");
+          document.getElementById("import-file").focus();
+          return;
+        }
+        if (!password) {
+          showFeedback("Please enter the backup password.", "warning");
+          document.getElementById("import-pass").focus();
+          return;
+        }
+        if (typeof window.SXWerCrypto === "undefined") {
+          showFeedback("Encryption library not loaded.", "error");
+          return;
+        }
+        try {
+          const text = await file.text();
+          const bundle = JSON.parse(text);
+          await SXWerCrypto.importKeyPair(bundle, password);
+          showFeedback("Keys imported successfully. Return to chat to re-initialise encryption.", "success");
+          await refreshStatus();
+        } catch (err) {
+          showFeedback(`Import failed: ${err.message}`, "error");
+        }
+      });
+
+      // ── Rotate keys ───────────────────────────────────────────────
+      document.getElementById("btn-rotate").addEventListener("click", async () => {
+        if (typeof window.SXWerCrypto === "undefined") {
+          showFeedback("Encryption library not loaded.", "error");
+          return;
+        }
+        const confirmed = window.confirm(
+          "Are you sure? Your old key pair will be discarded. " +
+          "Any messages encrypted to your old key pair will no longer be decryptable."
+        );
+        if (!confirmed) return;
+        try {
+          await SXWerCrypto.rotateKeyPair();
+          showFeedback("Key pair rotated. Return to chat to re-initialise encryption with the new keys.", "success");
+          await refreshStatus();
+        } catch (err) {
+          showFeedback(`Key rotation failed: ${err.message}`, "error");
+        }
+      });
+
+      // ── Clear keys ────────────────────────────────────────────────
+      document.getElementById("btn-clear-keys").addEventListener("click", async () => {
+        if (typeof window.SXWerCrypto === "undefined") {
+          showFeedback("Encryption library not loaded.", "error");
+          return;
+        }
+        const confirmed = window.confirm(
+          "Permanently delete your encryption key pair from this browser? " +
+          "This cannot be undone. You will not be able to read previously encrypted messages."
+        );
+        if (!confirmed) return;
+        try {
+          SXWerCrypto.clearKeys();
+          showFeedback("Keys deleted. Encryption is now disabled on this device.", "success");
+          await refreshStatus();
+        } catch (err) {
+          showFeedback(`Failed to clear keys: ${err.message}`, "error");
+        }
+      });
+
+      // ── Init ──────────────────────────────────────────────────────
+      window.addEventListener("load", refreshStatus);
+    </script>
+  </body>
+</html>

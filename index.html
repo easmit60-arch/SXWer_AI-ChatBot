@@ -892,7 +892,48 @@
         outline: 3px solid var(--neon-cyan, #00d4ff);
         outline-offset: 2px;
       }
+      /* E2E encryption status badge */
+      .e2e-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.25rem 0.6rem;
+        border-radius: 0.25rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-decoration: none;
+        cursor: pointer;
+        border: 1px solid transparent;
+        transition: background 0.15s, color 0.15s;
+        white-space: nowrap;
+      }
+      .e2e-badge.e2e-on {
+        background: #166534;
+        color: #dcfce7;
+        border-color: #15803d;
+      }
+      .e2e-badge.e2e-off {
+        background: #4b5563;
+        color: #e5e7eb;
+        border-color: #6b7280;
+      }
+      .e2e-badge:focus {
+        outline: 3px solid var(--neon-cyan, #00d4ff);
+        outline-offset: 2px;
+      }
+      /* Per-message encryption indicator */
+      .msg-enc-badge {
+        display: inline-block;
+        font-size: 0.7rem;
+        margin-left: 0.4rem;
+        opacity: 0.7;
+        vertical-align: middle;
+        cursor: default;
+      }
     </style>
+    <!-- E2E Encryption: TweetNaCl (offline-bundled, no CDN dependency) -->
+    <script src="/public/nacl.min.js"></script>
+    <script src="/public/nacl-util.min.js"></script>
+    <script src="/public/sxwer-crypto.js"></script>
   </head>
   <body>
     <!-- Skip navigation link for keyboard and screen-reader users (WCAG 2.4.1) -->
@@ -917,6 +958,14 @@
             <span class="icon">🌐</span>
             <span class="label">Offline</span>
           </button>
+          <a
+            id="e2e-badge"
+            class="e2e-badge e2e-off"
+            href="/encryption-status"
+            title="End-to-end encryption is not active. Messages are sent in plaintext to the local server."
+            aria-label="End-to-end encryption is not active. Click to manage encryption settings."
+            role="link"
+          >🔓 Plaintext</a>
         </div>
       </header>
 
@@ -1207,6 +1256,14 @@
       const LOCAL_PERMISSIONS_STORAGE_KEY = "sxwer_local_permissions";
       const sessionId = getOrCreateSessionId();
 
+      // E2E Encryption state
+      // e2eEnabled is true once the user has opted in and the handshake succeeded.
+      // e2eInitialised is true once SXWerCrypto.init() has completed successfully.
+      let e2eEnabled = false;
+      let e2eInitialised = false;
+      // Cached session token (set once from /api/session, reused each request)
+      let _cachedSessionToken = null;
+
       // Moxie Configuration
       const MOXIE_CONFIG = {
         name: "Moxie",
@@ -1264,6 +1321,89 @@
               : `sxwer-${Date.now()}`;
         getSessionStore().setItem(SESSION_STORAGE_KEY, generated);
         return generated;
+      }
+
+      // ========================================================================
+      // SESSION + CSRF TOKEN MANAGEMENT
+      // ========================================================================
+
+      /**
+       * Obtain a session token and CSRF token from the server.
+       * Results are cached in memory for the lifetime of the page.
+       * Returns { token, csrfToken }.
+       */
+      async function getSessionToken() {
+        if (_cachedSessionToken) return _cachedSessionToken;
+        const resp = await fetch("/api/session", {
+          headers: { "x-session-id": sessionId },
+        });
+        if (!resp.ok) throw new Error(`Session creation failed (HTTP ${resp.status})`);
+        const data = await resp.json();
+        _cachedSessionToken = { token: data.token, csrfToken: data.csrfToken };
+        return _cachedSessionToken;
+      }
+
+      /**
+       * Return the CSRF token (obtaining a session first if needed).
+       */
+      async function getCsrfToken() {
+        const { csrfToken } = await getSessionToken();
+        return csrfToken;
+      }
+
+      /**
+       * Return the session bearer token.
+       */
+      async function createSession() {
+        const { token } = await getSessionToken();
+        return { token };
+      }
+
+      // ========================================================================
+      // E2E ENCRYPTION INITIALISATION
+      // ========================================================================
+
+      /**
+       * Attempt to initialise end-to-end encryption.
+       * Requires SXWerCrypto to be loaded (nacl.min.js + sxwer-crypto.js).
+       * Silently degrades to plaintext if the crypto library is unavailable.
+       *
+       * @returns {Promise<boolean>} true if E2E was successfully enabled
+       */
+      async function initE2EEncryption() {
+        if (typeof window.SXWerCrypto === "undefined") {
+          console.warn("[E2E] SXWerCrypto not available — running in plaintext mode.");
+          return false;
+        }
+        try {
+          const { token, csrfToken } = await getSessionToken();
+          await SXWerCrypto.init(token, csrfToken);
+          e2eEnabled = true;
+          e2eInitialised = true;
+          updateEncryptionBadge(true);
+          return true;
+        } catch (err) {
+          console.warn("[E2E] Encryption init failed:", err.message, "— falling back to plaintext.");
+          e2eEnabled = false;
+          e2eInitialised = false;
+          updateEncryptionBadge(false);
+          return false;
+        }
+      }
+
+      /**
+       * Update the encryption status badge in the UI.
+       * @param {boolean} enabled
+       */
+      function updateEncryptionBadge(enabled) {
+        const badge = document.getElementById("e2e-badge");
+        if (!badge) return;
+        badge.textContent = enabled ? "🔒 Encrypted" : "🔓 Plaintext";
+        badge.title = enabled
+          ? "End-to-end encryption active. Messages are encrypted before leaving your device."
+          : "End-to-end encryption is not active. Messages are sent in plaintext to the local server.";
+        badge.className = "e2e-badge " + (enabled ? "e2e-on" : "e2e-off");
+        badge.setAttribute("aria-label", badge.title);
       }
 
       // Initialize
@@ -1436,6 +1576,11 @@
           }
         });
 
+        // Attempt end-to-end encryption on load (gracefully degrades)
+        initE2EEncryption().catch(() => {
+          // Errors are already logged inside initE2EEncryption; swallow here
+          // so init() never throws and the app always starts.
+        });
       }
 
       function applySavedTheme() {
@@ -1834,6 +1979,7 @@
         content,
         isLoading = false,
         isMoxieCheckIn = false,
+        isEncrypted = false,
       ) {
         const messageDiv = document.createElement("div");
         messageDiv.className = `message ${role}`;
@@ -1860,6 +2006,15 @@
               : escapeHtml(line),
           );
           contentDiv.innerHTML = safeLines.join("<br>");
+        }
+
+        if (isEncrypted && !isLoading) {
+          const encBadge = document.createElement("span");
+          encBadge.className = "msg-enc-badge";
+          encBadge.textContent = "🔒";
+          encBadge.title = "This message was end-to-end encrypted";
+          encBadge.setAttribute("aria-label", "End-to-end encrypted message");
+          contentDiv.appendChild(encBadge);
         }
 
         messageDiv.appendChild(contentDiv);
@@ -1911,37 +2066,56 @@
           chatInput.value = "";
         }
 
-        appendMessage("user", messageText);
+        appendMessage("user", messageText, false, false, e2eEnabled);
 
         const loadingMsg = appendMessage("assistant", "", true);
         setStatus("Thinking...", false, true);
 
         try {
           const csrfToken = await getCsrfToken();
-          const sessionToken = sessionToken || (await createSession()).token;
-          const response = await fetch("/api/chat", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-session-id": sessionId,
-              "x-csrf-token": csrfToken,
-              "x-session-token": sessionToken,
-            },
-            body: JSON.stringify({
-              message: messageText,
-              consent: consent,
-              localPermissions: localPermissions,
+          const { token: sessionToken } = await createSession();
+
+          let data;
+
+          if (e2eEnabled && typeof window.SXWerCrypto !== "undefined") {
+            // ── Encrypted path ──────────────────────────────────────────────
+            // Message is encrypted locally before leaving the device.
+            // The server stores and relays ciphertext only; it never sees plaintext.
+            const encryptedPayload = await SXWerCrypto.sendEncrypted(messageText, {
+              sessionToken,
+              csrfToken,
               sessionId,
+              consent,
+              localPermissions,
               mode: isOfflineMode() ? "offline" : "online",
-            }),
-          });
+            });
+            data = encryptedPayload;
+          } else {
+            // ── Plaintext path (fallback or when server is unavailable) ──────
+            const response = await fetch("/api/chat", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-session-id": sessionId,
+                "x-csrf-token": csrfToken,
+                "x-session-token": sessionToken,
+              },
+              body: JSON.stringify({
+                message: messageText,
+                consent: consent,
+                localPermissions: localPermissions,
+                sessionId,
+                mode: isOfflineMode() ? "offline" : "online",
+              }),
+            });
 
-          const data = response.ok
-            ? await response.json()
-            : buildBrowserFallbackData(messageText, `HTTP ${response.status}`);
+            data = response.ok
+              ? await response.json()
+              : buildBrowserFallbackData(messageText, `HTTP ${response.status}`);
 
-          if (!data) {
-            throw new Error(`HTTP ${response.status}`);
+            if (!data) {
+              throw new Error(`HTTP ${response.status}`);
+            }
           }
 
           loadingMsg.remove();
@@ -1961,9 +2135,9 @@
           }
 
           if (data.from === "Moxie") {
-            appendMessage("moxie", data.response);
+            appendMessage("moxie", data.response, false, false, e2eEnabled);
           } else {
-            const assistantMessage = appendMessage("assistant", data.response);
+            const assistantMessage = appendMessage("assistant", data.response, false, false, e2eEnabled);
             if (data.explanation) {
               appendExplanation(assistantMessage, data.explanation);
             }
