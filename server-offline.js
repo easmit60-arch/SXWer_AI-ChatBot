@@ -73,6 +73,56 @@ app.use("/api/", limiter);
 
 // Cookie parser for CSRF token handling
 app.use(cookieParser());
+n// Session token management
+const sessionTokens = new Map();
+
+function generateSessionToken() {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let token = "";
+  for (let i = 0; i < 32; i++) {
+    token += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return token;
+}
+
+function createSession() {
+  const token = generateSessionToken();
+  const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  sessionTokens.set(token, { sessionId, createdAt: Date.now(), lastUsed: Date.now() });
+  return { token, sessionId };
+}
+
+function validateSessionToken(token) {
+  if (!token || typeof token !== "string") return null;
+  const session = sessionTokens.get(token);
+  if (!session) return null;
+  session.lastUsed = Date.now();
+  return session.sessionId;
+}
+
+function requireAuth(req, res, next) {
+  const token = req.headers["x-session-token"] || req.query.token;
+  if (!token) {
+    return res.status(401).json({ error: "Authentication required", details: "Please provide a valid session token" });
+  }
+  const sessionId = validateSessionToken(token);
+  if (!sessionId) {
+    return res.status(401).json({ error: "Invalid session token", details: "The provided session token is invalid or expired" });
+  }
+  req.sessionId = sessionId;
+  next();
+}
+
+// Session cleanup every hour
+setInterval(() => {
+  const now = Date.now();
+  const SESSION_TTL = 24 * 60 * 60 * 1000;
+  for (const [token, session] of sessionTokens.entries()) {
+    if (now - session.lastUsed > SESSION_TTL) {
+      sessionTokens.delete(token);
+    }
+  }
+}, 60 * 60 * 1000);
 
 // CSRF protection setup
 const csrfProtection = csrf({ cookie: true });
@@ -621,7 +671,7 @@ async function callPythonNLP(text, sessionId = "default") {
  * POST /chat - Handle chat messages
  * Enforces all ethical constraints
  */
-app.post("/api/chat", validateChatInput, csrfProtection, async (req, res) => {
+app.post("/api/chat", validateChatInput, csrfProtection, requireAuth, async (req, res) => {
   try {
     const { message, consent, localPermissions, mode } = req.body;
     const sessionId = getSessionIdFromRequest(req);
@@ -969,7 +1019,7 @@ app.get("/api/python-status", async (req, res) => {
 /**
  * GET /moxie-checkin - Moxie gentle check-in endpoint
  */
-app.post("/api/local-permissions", csrfProtection, (req, res) => {
+app.post("/api/local-permissions", csrfProtection, requireAuth, (req, res) => {
   const sessionId = getSessionIdFromRequest(req);
   const { allow, scope } = req.body || {};
   const granted = Boolean(allow);
@@ -1060,7 +1110,7 @@ app.get("/api/consent-status", (req, res) => {
 /**
  * POST /consent - Set consent
  */
-app.post("/api/consent", csrfProtection, (req, res) => {
+app.post("/api/consent", csrfProtection, requireAuth, (req, res) => {
   const sessionId = getSessionIdFromRequest(req);
   const { ai, tools } = req.body;
   setUserConsent(ai, tools, sessionId);
