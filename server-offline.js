@@ -33,6 +33,7 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(express.json({ limit: "10mb" }));
+app.use(express.static(__dirname, { index: false }));
 
 // ============================================================================
 // OFFLINE MODE CONFIGURATION
@@ -863,20 +864,6 @@ app.get("/api/health", (req, res) => {
  */
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
-});
-
-/**
- * GET /moxie.css - Serve Moxie-specific styles
- */
-app.get("/moxie.css", (req, res) => {
-  res.sendFile(path.join(__dirname, "moxie.css"));
-});
-
-/**
- * GET /riot-grrrl.css - Serve Riot Grrrl palette
- */
-app.get("/riot-grrrl.css", (req, res) => {
-  res.sendFile(path.join(__dirname, "riot-grrrl.css"));
 });
 
 /**
