@@ -872,11 +872,33 @@
           width: 100%;
         }
       }
+
+      /* Skip navigation link — visible only on keyboard focus (WCAG 2.4.1) */
+      .skip-link {
+        position: absolute;
+        top: -100%;
+        left: 0;
+        padding: 0.5rem 1rem;
+        background: var(--purple, #7d2cff);
+        color: #fff;
+        font-weight: bold;
+        z-index: 9999;
+        text-decoration: none;
+        border-radius: 0 0 0.25rem 0;
+        transition: top 0.1s ease;
+      }
+      .skip-link:focus {
+        top: 0;
+        outline: 3px solid var(--neon-cyan, #00d4ff);
+        outline-offset: 2px;
+      }
     </style>
   </head>
   <body>
+    <!-- Skip navigation link for keyboard and screen-reader users (WCAG 2.4.1) -->
+    <a class="skip-link" href="#chat-main">Skip to chat</a>
     <div class="container">
-      <div class="header">
+      <header class="header">
         <h1>SXWer AI Chat Bot by SXWers</h1>
         <p>
           Trauma-informed support tool with Moxie, your desktop companion. Your
@@ -896,8 +918,9 @@
             <span class="label">Offline</span>
           </button>
         </div>
-      </div>
+      </header>
 
+      <main id="chat-main">
       <div class="chat-area">
         <div
           id="messages"
@@ -961,6 +984,7 @@
 
         <div id="status" class="status" role="status" aria-live="polite"></div>
       </div>
+      </main>
     </div>
 
     <!-- Moxie Paperclip Companion -->
