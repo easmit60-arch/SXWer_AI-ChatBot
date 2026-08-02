@@ -1083,6 +1083,32 @@
       </div>
     </div>
 
+    <script type="module">
+      import {
+        chatbot as browserLocalChatbot,
+        checkSherlockProtocol as browserCheckSherlockProtocol,
+        formatHumanNLP as browserFormatHumanNLP,
+        formatResponseForDisplay as browserFormatResponseForDisplay,
+        getConsentState as browserGetConsentState,
+        requestSherlockConsent as browserRequestSherlockConsent,
+        setUserConsent as browserSetUserConsent,
+        truncateForMirror as browserTruncateForMirror,
+      } from "./chatbot.js";
+      import resources from "./resources.json" with { type: "json" };
+
+      window.__sxwerLocalAssistant = {
+        chatbot: browserLocalChatbot,
+        checkSherlockProtocol: browserCheckSherlockProtocol,
+        formatHumanNLP: browserFormatHumanNLP,
+        formatResponseForDisplay: browserFormatResponseForDisplay,
+        getConsentState: browserGetConsentState,
+        requestSherlockConsent: browserRequestSherlockConsent,
+        setUserConsent: browserSetUserConsent,
+        truncateForMirror: browserTruncateForMirror,
+        resources,
+      };
+    </script>
+
     <script>
       // ========================================================================
       // CORE PRINCIPLES ENFORCED IN CODE
@@ -1371,6 +1397,207 @@
         return offlineToggle.classList.contains("off");
       }
 
+      function getBrowserLocalAssistant() {
+        return window.__sxwerLocalAssistant || null;
+      }
+
+      function buildBrowserFallbackData(messageText, reason = "backend unavailable") {
+        const assistant = getBrowserLocalAssistant();
+        if (!assistant) return null;
+
+        assistant.setUserConsent(consent.ai, consent.tools, sessionId);
+
+        if (messageText === "/resources" || messageText === "/help") {
+          const response = assistant.formatHumanNLP({
+            userInput: messageText,
+            anchor: "Here are resources and support organizations for sex workers:",
+            mirror: `You asked: "${messageText}"`,
+            reframe:
+              "These resources are available in the browser fallback while the API is unavailable.",
+            rapport:
+              "You can keep chatting here, use /consent yes for AI consent state, or try the server again later.",
+          });
+
+          return {
+            response: assistant.formatResponseForDisplay(response),
+            resources: assistant.resources?.organizations || [],
+            crisis_resources: assistant.resources?.crisis_resources || [],
+            safety_tips: assistant.resources?.safety_tips || [],
+            offline: true,
+            browserFallback: true,
+            fallbackReason: reason,
+          };
+        }
+
+        if (messageText.startsWith("/moxie ")) {
+          const moxieMessage = messageText.substring(7).trim();
+          const response = assistant.formatHumanNLP({
+            userInput: messageText,
+            anchor: "Moxie hears you.",
+            mirror: `You said to Moxie: "${moxieMessage}"`,
+            reframe:
+              "Moxie is still available in browser fallback mode for gentle support and reminders.",
+            rapport: "Would you like Moxie to check in more often?",
+          });
+
+          return {
+            response: assistant.formatResponseForDisplay(response),
+            from: "Moxie",
+            offline: true,
+            browserFallback: true,
+            fallbackReason: reason,
+          };
+        }
+
+        if (
+          messageText.toLowerCase() === "yes" ||
+          messageText.toLowerCase() === "/consent yes"
+        ) {
+          consent.ai = true;
+          consent.tools = true;
+          localStorage.setItem("sxwer_consent", JSON.stringify(consent));
+          assistant.setUserConsent(true, true, sessionId);
+
+          const response = assistant.formatHumanNLP({
+            userInput: messageText,
+            anchor: "Thank you for your consent.",
+            mirror: `You said: "${messageText}"`,
+            reframe:
+              "I saved your consent in this browser session. If the API is restored, online-capable features can use it again.",
+            rapport: "What would you like to talk about?",
+          });
+
+          return {
+            response: assistant.formatResponseForDisplay(response),
+            consentGranted: true,
+            consent: assistant.getConsentState(sessionId),
+            offline: true,
+            browserFallback: true,
+            fallbackReason: reason,
+          };
+        }
+
+        if (
+          messageText.toLowerCase() === "no" ||
+          messageText.toLowerCase() === "/consent no"
+        ) {
+          consent.ai = false;
+          consent.tools = false;
+          localStorage.setItem("sxwer_consent", JSON.stringify(consent));
+          assistant.setUserConsent(false, false, sessionId);
+
+          const response = assistant.formatHumanNLP({
+            userInput: messageText,
+            anchor: "Consent revoked.",
+            mirror: `You said: "${messageText}"`,
+            reframe:
+              "I will keep using only local browser responses while the API is unavailable.",
+            rapport: "How can I support you locally?",
+          });
+
+          return {
+            response: assistant.formatResponseForDisplay(response),
+            consentRevoked: true,
+            consent: assistant.getConsentState(sessionId),
+            offline: true,
+            browserFallback: true,
+            fallbackReason: reason,
+          };
+        }
+
+        if (messageText.startsWith("/sherlock ")) {
+          const username = messageText.substring(10).trim();
+          const protocolCheck = assistant.checkSherlockProtocol(messageText, {
+            sessionId,
+          });
+
+          if (
+            !protocolCheck.allowed &&
+            protocolCheck.reason !== "EXPLICIT_CONSENT_REQUIRED"
+          ) {
+            const response = assistant.formatHumanNLP({
+              userInput: messageText,
+              anchor: "I need to ensure Sherlock is used appropriately.",
+              mirror: `You requested: "${messageText}"`,
+              reframe: protocolCheck.message,
+              rapport:
+                "Would you like to rephrase this as a safety check for your own username?",
+            });
+
+            return {
+              response: assistant.formatResponseForDisplay(response),
+              offline: true,
+              browserFallback: true,
+              fallbackReason: reason,
+            };
+          }
+
+          if (!consent.tools) {
+            return {
+              response: assistant.formatResponseForDisplay(
+                assistant.requestSherlockConsent(username),
+              ),
+              requiresConsent: true,
+              consentType: "sherlock",
+              offline: true,
+              browserFallback: true,
+              fallbackReason: reason,
+            };
+          }
+
+          if (isOfflineMode() && !localPermissions.offline) {
+            const response = assistant.formatHumanNLP({
+              userInput: messageText,
+              anchor: "Offline local access requires your permission.",
+              mirror: `You requested: "${messageText}"`,
+              reframe:
+                "This browser fallback can only continue with local-only permission for offline safety checks.",
+              rapport:
+                "Would you like to allow local-only access for this offline session?",
+            });
+
+            return {
+              response: assistant.formatResponseForDisplay(response),
+              requiresLocalPermission: true,
+              localPermissionScope: "offline",
+              offline: true,
+              browserFallback: true,
+              fallbackReason: reason,
+            };
+          }
+
+          const response = assistant.formatHumanNLP({
+            userInput: messageText,
+            anchor: "Sherlock is limited in browser fallback mode.",
+            mirror: `You requested: "${messageText}"`,
+            reframe:
+              "The browser fallback can preserve consent and safety prompts, but the full Sherlock lookup still needs the local server path.",
+            rapport:
+              "Would you like to keep chatting here, or retry after the API is available again?",
+          });
+
+          return {
+            response: assistant.formatResponseForDisplay(response),
+            offline: true,
+            browserFallback: true,
+            fallbackReason: reason,
+          };
+        }
+
+        const localResponse = assistant.chatbot.processMessage(messageText, {
+          isSherlockRequest: false,
+          forceLocal: isOfflineMode() || !consent.ai,
+          sessionId,
+        });
+
+        return {
+          response: assistant.formatResponseForDisplay(localResponse),
+          offline: true,
+          browserFallback: true,
+          fallbackReason: reason,
+        };
+      }
+
       function saveLocalPermissions() {
         localStorage.setItem(
           "sxwer_local_permissions",
@@ -1604,9 +1831,14 @@
             }),
           });
 
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const data = response.ok
+            ? await response.json()
+            : buildBrowserFallbackData(messageText, `HTTP ${response.status}`);
 
-          const data = await response.json();
+          if (!data) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+
           loadingMsg.remove();
 
           // Handle consent response
@@ -1635,12 +1867,40 @@
           }
 
           setStatus(
-            data.offline
-              ? "Offline mode - Local responses only"
-              : "Online mode enabled",
+            data.browserFallback
+              ? "Browser fallback active - Local responses only"
+              : data.offline
+                ? "Offline mode - Local responses only"
+                : "Online mode enabled",
           );
         } catch (error) {
           loadingMsg.remove();
+          const fallbackData = buildBrowserFallbackData(messageText, error.message);
+          if (fallbackData) {
+            if (fallbackData.consentGranted) {
+              consent = fallbackData.consent;
+              localStorage.setItem("sxwer_consent", JSON.stringify(consent));
+            }
+            if (fallbackData.consentRevoked) {
+              consent = fallbackData.consent;
+              localStorage.setItem("sxwer_consent", JSON.stringify(consent));
+            }
+            if (fallbackData.requiresLocalPermission) {
+              showLocalPermissionDialog(
+                fallbackData.localPermissionScope || "offline",
+              );
+            }
+            if (fallbackData.from === "Moxie") {
+              appendMessage("moxie", fallbackData.response);
+            } else {
+              appendMessage("assistant", fallbackData.response);
+            }
+            if (fallbackData.requiresConsent) {
+              showConsentDialog(fallbackData.consentType);
+            }
+            setStatus("Browser fallback active - Local responses only");
+            return;
+          }
           // Format error with ethical structure
           const errorResponse = {
             anchor: "I encountered an error processing your request.",
