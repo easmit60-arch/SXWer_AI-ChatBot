@@ -620,25 +620,6 @@ if (OFFLINE_MODE) {
   await loadLocalModel();
 }
 
-// ============================================================================
-// ETHICAL CHATBOT INTEGRATION
-// ============================================================================
-
-import {
-  chatbot,
-  formatResponseForDisplay,
-  hasAIConsent,
-  hasToolConsent,
-  setUserConsent,
-  getConsentState,
-  checkSherlockProtocol,
-  requestSherlockConsent,
-  formatHumanNLP,
-  truncateForMirror,
-  detectBiasInAIResponse,
-  createAIExplanation,
-  handleToolRequest,
-} from "./chatbot.js";
 
 // ============================================================================
 // SHERLOCK OFFLINE IMPLEMENTATION
