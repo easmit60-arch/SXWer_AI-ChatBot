@@ -15,6 +15,19 @@
  */
 
 import crypto from 'crypto';
+import {
+  generateAnonymousSessionId,
+  isValidSessionId,
+  MAX_SESSION_ID_LENGTH,
+  consentStore,
+  setUserConsent,
+  getConsentState,
+  hasAIConsent,
+  hasToolConsent,
+  minimizeConsentState,
+  normalizeSessionId,
+  DEFAULT_CONSENT,
+} from './utils.js';
 
 // ============================================================================
 // DATA MINIMIZATION CONSTANTS
@@ -25,68 +38,6 @@ import crypto from 'crypto';
  * GDPR: Data should not be kept longer than necessary
  */
 const SESSION_TTL = 24 * 60 * 60 * 1000;
-
-/**
- * Maximum session ID length (64 characters)
- * Balances uniqueness and data minimization
- */
-const MAX_SESSION_ID_LENGTH = 64;
-
-/**
- * Allowed characters for session IDs (no user-identifiable info)
- * Uses only alphanumeric and safe symbols
- */
-const SESSION_ID_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-
-// ============================================================================
-// ANONYMOUS SESSION MANAGEMENT
-// ============================================================================
-
-/**
- * Generate a cryptographically secure, anonymous session ID
- * - Uses Node.js crypto module for security
- * - No user-identifiable information included
- * - Fixed length for data minimization
- * @returns {string} Anonymous session ID
- */
-function generateAnonymousSessionId() {
-  // Generate 32 bytes of random data (256 bits of entropy)
-  const randomBytes = crypto.randomBytes(32);
-  
-  // Convert to hex string (64 characters)
-  let sessionId = randomBytes.toString('hex');
-  
-  // Ensure it's exactly 64 characters (data minimization)
-  sessionId = sessionId.substring(0, MAX_SESSION_ID_LENGTH);
-  
-  return sessionId;
-}
-
-/**
- * Validate session ID format for data minimization compliance
- * @param {string} sessionId - Session ID to validate
- * @returns {boolean} True if valid
- */
-function isValidSessionId(sessionId) {
-  if (typeof sessionId !== 'string') return false;
-  if (sessionId.length === 0 || sessionId.length > MAX_SESSION_ID_LENGTH) return false;
-  
-  // Only allow hex characters (0-9, a-f) for consistency
-  // This ensures no user-identifiable information can be encoded
-  return /^[a-f0-9]+$/.test(sessionId);
-}
-
-// ============================================================================
-// MINIMAL CONSENT STORAGE
-// ============================================================================
-
-/**
- * Consent Store - Minimal data storage
- * Only stores: { ai: boolean, tools: boolean, grantedAt: number }
- * No user-identifiable information
- * Automatic cleanup via TTL
- */
-const consentStore = new Map();
 
 /**
  * Local Permissions Store - Minimal data storage
@@ -108,84 +59,9 @@ const pendingSherlockStore = new Map();
 // CONSENT MANAGEMENT FUNCTIONS
 // ============================================================================
 
-/**
- * Normalize and validate session ID for data minimization
- * @param {string} sessionId - Session ID to normalize
- * @returns {string} Normalized session ID (defaults to new anonymous ID if invalid)
- */
-function normalizeSessionId(sessionId = null) {
-  // If no session ID provided, generate a new anonymous one
-  if (!sessionId) {
-    return generateAnonymousSessionId();
-  }
-  
-  const normalized = String(sessionId).trim();
-  
-  // Validate session ID format for data minimization
-  if (!isValidSessionId(normalized)) {
-    console.warn(`[PRIVACY] Invalid session ID format detected. Generating new anonymous session ID.`);
-    return generateAnonymousSessionId();
-  }
-  
-  return normalized;
-}
-
-/**
- * Set user consent with data minimization
- * @param {boolean} aiConsent - Consent for AI usage
- * @param {boolean} toolsConsent - Consent for tool usage
- * @param {string} sessionId - Session identifier
- */
-function setUserConsent(aiConsent = false, toolsConsent = false, sessionId = null) {
-  const normalizedSessionId = normalizeSessionId(sessionId);
-  
-  // Store only the minimal necessary data
-  const consentState = {
-    ai: Boolean(aiConsent),
-    tools: Boolean(toolsConsent),
-    grantedAt: Date.now(), // For TTL cleanup
-  };
-  
-  consentStore.set(normalizedSessionId, consentState);
-  
-  // Audit log (no sensitive data)
-  console.log(`[CONSENT] Consent state updated for anonymous session.`);
-}
-
-/**
- * Check if AI consent is granted
- * @param {string} sessionId - Session identifier
- * @returns {boolean} True if AI consent is granted
- */
-function hasAIConsent(sessionId = null) {
-  const normalizedSessionId = normalizeSessionId(sessionId);
-  const consent = consentStore.get(normalizedSessionId);
-  return consent?.ai === true;
-}
-
-/**
- * Check if tool consent is granted
- * @param {string} sessionId - Session identifier
- * @returns {boolean} True if tool consent is granted
- */
-function hasToolConsent(sessionId = null) {
-  const normalizedSessionId = normalizeSessionId(sessionId);
-  const consent = consentStore.get(normalizedSessionId);
-  return consent?.tools === true;
-}
-
-/**
- * Get consent state (minimal data only)
- * @param {string} sessionId - Session identifier
- * @returns {Object} Consent state (immutable)
- */
-function getConsentState(sessionId = null) {
-  const normalizedSessionId = normalizeSessionId(sessionId);
-  const consent = consentStore.get(normalizedSessionId);
-  
-  // Return minimal, immutable copy
-  return consent ? Object.freeze({ ...consent }) : Object.freeze({ ai: false, tools: false });
-}
+// Use shared consent and session utilities from utils.js
+// All duplicate functions have been removed and centralized in utils.js
+// Note: consent_manager.js adds TTL cleanup which is specific to this module
 
 // ============================================================================
 // CONSENT REVOCATION (GDPR Article 7 - Right to Withdraw Consent)

@@ -47,6 +47,15 @@ import {
   isWalletConnected,
 } from "./services/blockchain/walletService.js";
 import {
+  sanitizeUserMessage,
+  normalizeSessionId as utilsNormalizeSessionId,
+  consentStore,
+  setUserConsent,
+  getConsentState,
+  hasAIConsent,
+  hasToolConsent,
+} from "./utils.js";
+import {
   BLOCKCHAIN_ENABLED,
   INFORMED_CONSENT_DISCLOSURE,
 } from "./services/blockchain/ledgerConfig.js";
@@ -290,20 +299,7 @@ function isValidMessage(message) {
   return true;
 }
 
-/**
- * Validate session ID format
- * @param {string} sessionId - Session ID to validate
- * @returns {boolean} True if valid
- */
-function isValidSessionId(sessionId) {
-  if (typeof sessionId !== "string") {
-    return false;
-  }
-  if (sessionId.length === 0 || sessionId.length > MAX_SESSION_ID_LENGTH) {
-    return false;
-  }
-  return ALLOWED_SESSION_ID_PATTERN.test(sessionId);
-}
+// Use isValidSessionId from utils.js
 
 /**
  * Validate consent object structure
@@ -437,26 +433,10 @@ const DEFAULT_LOCAL_PERMISSIONS = Object.freeze({
 const localPermissionStore = new Map();
 const pendingSherlockStore = new Map();
 
-function resolveSessionId(sessionId = "default") {
-  const normalized = String(sessionId || "default").trim();
-  // Validate session ID format for security
-  if (!isValidSessionId(normalized)) {
-    console.warn(
-      `Invalid session ID format: ${sessionId}, defaulting to "default"`,
-    );
-    return "default";
-  }
-  return normalized || "default";
-}
-
-function sanitizeUserMessage(input) {
-  return String(input ?? "")
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
-    .trim();
-}
+// Use normalizeSessionId from utils.js (previously resolveSessionId)
 
 function getSessionIdFromRequest(req) {
-  return resolveSessionId(
+  return utilsNormalizeSessionId(
     req.body?.sessionId ||
       req.get("x-session-id") ||
       req.query?.sessionId ||
@@ -465,7 +445,7 @@ function getSessionIdFromRequest(req) {
 }
 
 function setLocalPermissions(sessionId = "default", permissions = {}) {
-  const normalizedSessionId = resolveSessionId(sessionId);
+  const normalizedSessionId = utilsNormalizeSessionId(sessionId);
   const localPermissionState = {
     offline: Boolean(permissions.offline),
     scope: permissions.scope || "offline",
@@ -492,7 +472,7 @@ function setLocalPermissions(sessionId = "default", permissions = {}) {
 
 function getLocalPermissions(sessionId = "default") {
   return {
-    ...(localPermissionStore.get(resolveSessionId(sessionId)) ||
+    ...(localPermissionStore.get(utilsNormalizeSessionId(sessionId)) ||
       DEFAULT_LOCAL_PERMISSIONS),
   };
 }

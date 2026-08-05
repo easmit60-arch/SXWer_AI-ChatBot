@@ -99,23 +99,22 @@ const CRISIS_RESOURCES = Object.freeze({
 // SECTION 2: CONSENT MANAGEMENT (Requirement 1 & 3)
 // ============================================================================
 
-/**
- * User consent state - MUST be explicitly set by user
- * @typedef {Object} UserConsent
- * @property {boolean} ai - Explicit consent for LLM/generative AI usage
- * @property {boolean} tools - Explicit consent for external tools (Sherlock, etc.)
- */
+import {
+  consentStore,
+  DEFAULT_CONSENT,
+  setUserConsent,
+  getConsentState,
+  hasAIConsent,
+  hasToolConsent,
+  minimizeConsentState,
+  normalizeSessionId,
+  isValidSessionId,
+  MAX_SESSION_ID_LENGTH,
+} from './utils.js';
 
-/**
- * Default consent state: NO consent for AI or tools
- * This enforces Requirement 1: "By default, NO generative AI should be used"
- */
-const DEFAULT_CONSENT = Object.freeze({
-  ai: false,
-  tools: false,
-});
+// Note: consentStore.delete(normalizedSessionId) is implemented in utils.js
+// for data minimization (GDPR compliance) when consent is revoked
 
-const consentStore = new Map();
 const SESSION_ID_PATTERN = /^[a-zA-Z0-9_-]{1,64}$/;
 const BIAS_PATTERNS = Object.freeze([
   {
@@ -147,96 +146,8 @@ const BIAS_PATTERNS = Object.freeze([
   },
 ]);
 
-// Session ID validation constants
-const MAX_SESSION_ID_LENGTH = 64;
-const ALLOWED_SESSION_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
-
-/**
- * Validate session ID format
- * @param {string} sessionId - Session ID to validate
- * @returns {boolean} True if valid
- */
-function isValidSessionId(sessionId) {
-  if (typeof sessionId !== "string") {
-    return false;
-  }
-  if (sessionId.length === 0 || sessionId.length > MAX_SESSION_ID_LENGTH) {
-    return false;
-  }
-  return ALLOWED_SESSION_ID_PATTERN.test(sessionId);
-}
-
-function normalizeSessionId(sessionId = "default") {
-  const normalized = String(sessionId || "default").trim();
-  // Validate session ID format for security
-  if (!isValidSessionId(normalized)) {
-    console.warn(`Invalid session ID format: ${sessionId}, defaulting to "default"`);
-    return "default";
-  }
-  return normalized || "default";
-}
-
-function minimizeConsentState(consentState = DEFAULT_CONSENT) {
-  return Object.freeze({
-    ai: Boolean(consentState?.ai),
-    tools: Boolean(consentState?.tools),
-  });
-}
-
-/**
- * Set user consent for AI and/or tools
- * @param {boolean} aiConsent - Consent for AI usage
- * @param {boolean} toolsConsent - Consent for tool usage
- */
-function setUserConsent(aiConsent = false, toolsConsent = false, sessionId = "default") {
-  const normalizedSessionId = normalizeSessionId(sessionId);
-  const consentState = minimizeConsentState({
-    ai: aiConsent,
-    tools: toolsConsent,
-  });
-  if (!consentState.ai && !consentState.tools) {
-    consentStore.delete(normalizedSessionId);
-  } else {
-    consentStore.set(normalizedSessionId, consentState);
-  }
-  // Do not log consent values — they are sensitive user state
-  console.log("[CONSENT] Consent state updated for session.");
-
-  // Audit log for transparency (no values logged)
-  if (aiConsent) {
-    console.log("[AUDIT] AI consent granted.");
-  }
-  if (toolsConsent) {
-    console.log("[AUDIT] Tools consent granted.");
-  }
-}
-
-/**
- * Check if AI usage is permitted
- * @returns {boolean} True if user has explicitly consented to AI
- */
-function hasAIConsent(sessionId = "default") {
-  return getConsentState(sessionId).ai === true;
-}
-
-/**
- * Check if tool usage is permitted
- * @returns {boolean} True if user has explicitly consented to tools
- */
-function hasToolConsent(sessionId = "default") {
-  return getConsentState(sessionId).tools === true;
-}
-
-/**
- * Get current consent state (immutable copy)
- * @returns {UserConsent} Current consent state
- */
-function getConsentState(sessionId = "default") {
-  const normalizedSessionId = normalizeSessionId(sessionId);
-  return minimizeConsentState(
-    consentStore.get(normalizedSessionId) || DEFAULT_CONSENT,
-  );
-}
+// Use shared consent and session utilities from utils.js
+// All duplicate functions have been removed and centralized in utils.js
 
 function detectBiasInAIResponse(responseText = "") {
   const text = String(responseText || "").trim();

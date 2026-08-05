@@ -25,7 +25,7 @@
   "author": "SXWers",
   "license": "MIT",
   "dependencies": {
-    "arweave": "^1.15.0",
+    "arweave": "^1.15.7",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.6",
     "csrf": "^3.1.0",
