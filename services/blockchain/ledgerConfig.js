@@ -10,6 +10,8 @@
  * WHAT THIS CONFIGURES:
  * - Whether blockchain support is enabled at all
  * - Which abstract provider to use (ethereum, polygon, hyperledger, hedera, consortium, mock)
+ * - Arweave configuration for permanent data storage
+ * - IPFS configuration for decentralized file storage
  * - Connection settings (never stored in source code)
  * - Consent ledger schema version
  */
@@ -36,6 +38,7 @@ const SUPPORTED_PROVIDERS = Object.freeze([
   'hyperledger',
   'hedera',
   'consortium',
+  'arweave', // Arweave for permanent data storage
   'mock', // In-memory provider for testing and offline simulation
 ]);
 
@@ -120,11 +123,64 @@ const PROVIDER_CONFIG = Object.freeze({
     chainId:     process.env.CONSORTIUM_CHAIN_ID   || null,
     contractAddress: process.env.CONSENT_CONTRACT_CONSORTIUM || null,
   },
+  arweave: {
+    host:       process.env.ARWEAVE_HOST          || 'arweave.net',
+    port:       parseInt(process.env.ARWEAVE_PORT) || 443,
+    protocol:   process.env.ARWEAVE_PROTOCOL      || 'https',
+    walletPath: process.env.ARWEAVE_WALLET_PATH    || null,
+    // Wallet key is loaded separately, never stored in config
+  },
   mock: {
     // No network config required. Mock provider stores receipts in memory only.
     persist:     process.env.MOCK_LEDGER_PERSIST   === 'true',
   },
 });
+
+// ============================================================================
+// ARWEAVE CONFIGURATION
+// ============================================================================
+
+/**
+ * Arweave-specific configuration.
+ * Arweave is used for permanent, low-cost data storage.
+ */
+const ARWEAVE_CONFIG = Object.freeze({
+  host: PROVIDER_CONFIG.arweave.host,
+  port: PROVIDER_CONFIG.arweave.port,
+  protocol: PROVIDER_CONFIG.arweave.protocol,
+  walletPath: PROVIDER_CONFIG.arweave.walletPath,
+});
+
+/**
+ * Whether Arweave is enabled.
+ * Requires both BLOCKCHAIN_ENABLED and ARWEAVE-specific config.
+ */
+const ARWEAVE_ENABLED = BLOCKCHAIN_ENABLED && 
+  PROVIDER_CONFIG.arweave.host !== null;
+
+// ============================================================================
+// IPFS CONFIGURATION
+// ============================================================================
+
+/**
+ * IPFS-specific configuration.
+ * IPFS is used for decentralized file storage.
+ */
+const IPFS_CONFIG = Object.freeze({
+  host: process.env.IPFS_HOST || 'ipfs.infura.io',
+  port: parseInt(process.env.IPFS_PORT) || 5001,
+  protocol: process.env.IPFS_PROTOCOL || 'https',
+  projectId: process.env.IPFS_PROJECT_ID || null,
+  projectSecret: process.env.IPFS_PROJECT_SECRET || null,
+  authToken: process.env.IPFS_AUTH_TOKEN || null,
+});
+
+/**
+ * Whether IPFS is enabled.
+ * Requires both BLOCKCHAIN_ENABLED and IPFS-specific config.
+ */
+const IPFS_ENABLED = BLOCKCHAIN_ENABLED && 
+  IPFS_CONFIG.host !== null;
 
 // ============================================================================
 // HUMAN RIGHTS DISCLOSURE TEXT
@@ -180,4 +236,12 @@ export {
   CONSENT_EVENT_TYPES,
   PROVIDER_CONFIG,
   INFORMED_CONSENT_DISCLOSURE,
+  
+  // Arweave configuration
+  ARWEAVE_ENABLED,
+  ARWEAVE_CONFIG,
+  
+  // IPFS configuration
+  IPFS_ENABLED,
+  IPFS_CONFIG,
 };
