@@ -1,0 +1,34 @@
+{
+  "name": "@sxwer/audio-service",
+  "version": "1.0.0",
+  "description": "Mistral Audio Service for SXWer AI ChatBot - TTS and STT with privacy protections",
+  "main": "MistralAudioService.js",
+  "type": "module",
+  "scripts": {
+    "test": "node test.js",
+    "test:tts": "node examples/tts.js",
+    "test:stt": "node examples/stt.js"
+  },
+  "keywords": [
+    "audio",
+    "tts",
+    "stt",
+    "speech-to-text",
+    "text-to-speech",
+    "mistral",
+    "api",
+    "privacy",
+    "consent"
+  ],
+  "author": "SXWer AI ChatBot Team",
+  "license": "MIT",
+  "dependencies": {
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "dotenv": "^16.3.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
