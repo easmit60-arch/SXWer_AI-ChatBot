@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SXWer AI ChatBot - GitHub Pages Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f7f5ef;
+            color: #111111;
+        }
+        h1 { color: #ff2d95; }
+        h2 { color: #7d2cff; }
+        .test-section {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            border: 1px solid #ddd;
+        }
+        .test-button {
+            background: #ff2d95;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        .test-button:hover {
+            background: #e62580;
+        }
+        .test-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            background: #f0f0f0;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+        }
+        pre {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+        .console-output {
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>🚨 SXWer AI ChatBot - GitHub Pages Diagnostic Test</h1>
+    
+    <div class="test-section">
+        <h2>📋 Test Overview</h2>
+        <p>This diagnostic tool will help identify why your chatbot isn't working on GitHub Pages.</p>
+        <p><strong>Current URL:</strong> <span id="current-url"></span></p>
+        <p><strong>Status:</strong> <span id="test-status">Initializing...</span></p>
+    </div>
+
+    <div class="test-section">
+        <h2>🔍 Step 1: Basic Connectivity Test</h2>
+        <p>Testing if the page can load and JavaScript is working...</p>
+        <button class="test-button" onclick="testBasicConnectivity()">Test Basic Connectivity</button>
+        <div id="connectivity-result" class="result hidden"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>📡 Step 2: API Endpoint Test</h2>
+        <p>Testing if backend API endpoints are accessible...</p>
+        <button class="test-button" onclick="testApiEndpoints()">Test API Endpoints</button>
+        <div id="api-result" class="result hidden"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>📁 Step 3: Static Asset Test</h2>
+        <p>Testing if static JavaScript files are loading...</p>
+        <button class="test-button" onclick="testStaticAssets()">Test Static Assets</button>
+        <div id="assets-result" class="result hidden"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🎯 Step 4: Chatbot Functionality Test</h2>
+        <p>Testing if the chatbot can respond to messages...</p>
+        <div style="display: flex; gap: 10px; margin: 15px 0;">
+            <input type="text" id="test-message" placeholder="Type a test message..." style="flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px;">
+            <button class="test-button" onclick="testChatbot()">Send Test Message</button>
+        </div>
+        <div id="chatbot-result" class="result hidden"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🔧 Step 5: Configuration Test</h2>
+        <p>Testing current configuration...</p>
+        <button class="test-button" onclick="testConfiguration()">Test Configuration</button>
+        <div id="config-result" class="result hidden"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>💡 Step 6: Recommended Fixes</h2>
+        <p>Based on test results, here are the recommended fixes:</p>
+        <div id="fixes-result" class="result hidden"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>📊 Test Summary</h2>
+        <p>Summary of all test results:</p>
+        <div id="summary-result" class="result hidden"></div>
+    </div>
+
+    <script>
+        // Initialize
+        document.getElementById('current-url').textContent = window.location.href;
+        
+        // Test results storage
+        const testResults = {
+            connectivity: null,
+            api: null,
+            assets: null,
+            chatbot: null,
+            configuration: null
+        };
+
+        // Helper functions
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `result ${type}`;
+            element.classList.remove('hidden');
+            return message;
+        }
+
+        function addConsoleOutput(elementId, message, type = 'log') {
+            const element = document.getElementById(elementId);
+            const consoleDiv = document.createElement('div');
+            consoleDiv.className = `console-output ${type}`;
+            consoleDiv.textContent = message;
+            element.appendChild(consoleDiv);
+        }
+
+        // Step 1: Basic Connectivity Test
+        async function testBasicConnectivity() {
+            showResult('connectivity-result', 'Testing...', 'info');
+            
+            try {
+                // Test if JavaScript is working
+                const jsWorks = typeof document !== 'undefined' && document.body;
+                
+                // Test if we can access DOM elements
+                const chatInput = document.getElementById('chat-input');
+                const sendBtn = document.getElementById('send-btn');
+                
+                // Test if chatbot functions exist
+                const chatbotExists = typeof window.__sxwerLocalAssistant !== 'undefined';
+                
+                let message = '✅ Basic connectivity: PASSED\n';
+                message += `   - JavaScript: ${jsWorks ? '✅ Working' : '❌ Failed'}\n`;
+                message += `   - DOM Access: ${chatInput || sendBtn ? '✅ Working' : '❌ Failed'}\n`;
+                message += `   - Chatbot: ${chatbotExists ? '✅ Available' : '❌ Not loaded'}\n`;
+                
+                if (jsWorks && (chatInput || sendBtn) && chatbotExists) {
+                    testResults.connectivity = 'PASSED';
+                    showResult('connectivity-result', message, 'success');
+                } else {
+                    testResults.connectivity = 'FAILED';
+                    showResult('connectivity-result', message, 'error');
+                }
+            } catch (error) {
+                testResults.connectivity = 'ERROR';
+                showResult('connectivity-result', `❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Step 2: API Endpoint Test
+        async function testApiEndpoints() {
+            showResult('api-result', 'Testing API endpoints...', 'info');
+            
+            const endpoints = [
+                '/api/session',
+                '/api/health',
+                '/api/chat',
+                '/api/local-permissions'
+            ];
+            
+            let allPassed = true;
+            let message = 'API Endpoint Test Results:\n\n';
+            
+            for (const endpoint of endpoints) {
+                try {
+                    const response = await fetch(endpoint, {
+                        method: 'GET',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    
+                    const status = response.ok ? '✅' : '❌';
+                    const statusText = response.status === 404 ? 'Not Found' : 
+                                      response.status === 500 ? 'Server Error' :
+                                      `${response.status}`;
+                    
+                    message += `${status} ${endpoint}: ${statusText}\n`;
+                    
+                    if (!response.ok) {
+                        allPassed = false;
+                    }
+                } catch (error) {
+                    message += `❌ ${endpoint}: ${error.message}\n`;
+                    allPassed = false;
+                }
+            }
+            
+            if (allPassed) {
+                testResults.api = 'PASSED';
+                showResult('api-result', message, 'success');
+            } else {
+                testResults.api = 'FAILED';
+                showResult('api-result', message + '\n\n💡 This is expected on GitHub Pages - backend cannot run here!', 'warning');
+            }
+        }
+
+        // Step 3: Static Asset Test
+        async function testStaticAssets() {
+            showResult('assets-result', 'Testing static assets...', 'info');
+            
+            const assets = [
+                'public/nacl.min.js',
+                'public/nacl-util.min.js',
+                'public/sxwer-crypto.js',
+                'chatbot.js',
+                'resources.json'
+            ];
+            
+            let allPassed = true;
+            let message = 'Static Asset Test Results:\n\n';
+            
+            for (const asset of assets) {
+                try {
+                    // Try to fetch the asset
+                    const response = await fetch(asset);
+                    
+                    if (response.ok) {
+                        message += `✅ ${asset}: Loaded (${response.headers.get('Content-Type')})\n`;
+                    } else {
+                        message += `❌ ${asset}: ${response.status} ${response.statusText}\n`;
+                        allPassed = false;
+                    }
+                } catch (error) {
+                    message += `❌ ${asset}: ${error.message}\n`;
+                    allPassed = false;
+                }
+            }
+            
+            if (allPassed) {
+                testResults.assets = 'PASSED';
+                showResult('assets-result', message, 'success');
+            } else {
+                testResults.assets = 'FAILED';
+                showResult('assets-result', message + '\n\n💡 Check file paths - they may need to be relative!', 'error');
+            }
+        }
+
+        // Step 4: Chatbot Functionality Test
+        async function testChatbot() {
+            const message = document.getElementById('test-message').value.trim();
+            if (!message) {
+                showResult('chatbot-result', 'Please enter a test message', 'error');
+                return;
+            }
+            
+            showResult('chatbot-result', 'Testing chatbot response...', 'info');
+            
+            try {
+                // Try to use the local chatbot
+                if (window.__sxwerLocalAssistant?.chatbot) {
+                    const response = window.__sxwerLocalAssistant.chatbot(message, {
+                        sessionId: 'test-session',
+                        consent: { ai: false, tools: false },
+                        localPermissions: { offline: true },
+                        mode: 'offline'
+                    });
+                    
+                    if (response && response.response) {
+                        testResults.chatbot = 'PASSED';
+                        showResult('chatbot-result', `✅ Chatbot responded:\n\n${response.response}`, 'success');
+                    } else {
+                        testResults.chatbot = 'FAILED';
+                        showResult('chatbot-result', `❌ Chatbot returned empty response: ${JSON.stringify(response)}`, 'error');
+                    }
+                } else {
+                    testResults.chatbot = 'NOT_AVAILABLE';
+                    showResult('chatbot-result', '❌ Local chatbot not available. Check if chatbot.js is loaded.', 'error');
+                }
+            } catch (error) {
+                testResults.chatbot = 'ERROR';
+                showResult('chatbot-result', `❌ Error: ${error.message}\n\n${error.stack}`, 'error');
+            }
+        }
+
+        // Step 5: Configuration Test
+        async function testConfiguration() {
+            showResult('config-result', 'Testing configuration...', 'info');
+            
+            let message = 'Configuration Test Results:\n\n';
+            
+            // Check if we're on GitHub Pages
+            const isGitHubPages = window.location.hostname.includes('github.io');
+            message += `📍 Host: ${window.location.hostname} (GitHub Pages: ${isGitHubPages ? '✅ Yes' : '❌ No'})\n`;
+            
+            // Check online API configuration
+            const onlineApiConfigured = window.onlineApiConfigured !== false;
+            message += `🌐 Online API: ${onlineApiConfigured ? '✅ Enabled' : '❌ Disabled'}\n`;
+            
+            // Check if chatbot is available
+            const chatbotAvailable = typeof window.__sxwerLocalAssistant !== 'undefined';
+            message += `🤖 Chatbot: ${chatbotAvailable ? '✅ Available' : '❌ Not loaded'}\n`;
+            
+            // Check consent state
+            const consent = window.consent || { ai: false, tools: false };
+            message += `📋 Consent: AI=${consent.ai ? '✅' : '❌'}, Tools=${consent.tools ? '✅' : '❌'}\n`;
+            
+            // Check local permissions
+            const localPermissions = window.localPermissions || { offline: false };
+            message += `🔐 Local Permissions: Offline=${localPermissions.offline ? '✅' : '❌'}\n`;
+            
+            // Determine if offline mode is possible
+            const offlineModePossible = chatbotAvailable && !onlineApiConfigured;
+            message += `\n🎯 Offline Mode: ${offlineModePossible ? '✅ Possible' : '❌ Not possible'}\n`;
+            
+            testResults.configuration = offlineModePossible ? 'PASSED' : 'FAILED';
+            
+            if (isGitHubPages && onlineApiConfigured) {
+                showResult('config-result', message + '\n\n⚠️ WARNING: Online API is enabled but you are on GitHub Pages (no backend support)!', 'warning');
+            } else if (isGitHubPages && offlineModePossible) {
+                showResult('config-result', message + '\n\n✅ Offline mode should work on GitHub Pages!', 'success');
+            } else {
+                showResult('config-result', message, 'info');
+            }
+        }
+
+        // Step 6: Generate Recommended Fixes
+        function generateFixes() {
+            const isGitHubPages = window.location.hostname.includes('github.io');
+            let message = 'Recommended Fixes:\n\n';
+            
+            // Check if we're on GitHub Pages
+            if (isGitHubPages) {
+                message += '🎯 You are on GitHub Pages (static hosting only)\n';
+                message += '   GitHub Pages CANNOT run Node.js backend!\n\n';
+            }
+            
+            // Check connectivity
+            if (testResults.connectivity === 'FAILED') {
+                message += '❌ Basic connectivity failed\n';
+                message += '   → Check if JavaScript is enabled in your browser\n';
+                message += '   → Verify index.html loads correctly\n\n';
+            }
+            
+            // Check API endpoints
+            if (testResults.api === 'FAILED' && isGitHubPages) {
+                message += '⚠️ API endpoints not available (expected on GitHub Pages)\n';
+                message += '   → Solution: Enable offline mode\n';
+                message += '   → Or: Deploy backend to Render/Railway/Vercel\n\n';
+            }
+            
+            // Check static assets
+            if (testResults.assets === 'FAILED') {
+                message += '❌ Static assets not loading\n';
+                message += '   → Fix: Use relative paths (e.g., "public/chatbot.js" instead of "/public/chatbot.js")\n';
+                message += '   → Add <base href="/SXWer_AI-ChatBot/"> to <head>\n\n';
+            }
+            
+            // Check chatbot
+            if (testResults.chatbot === 'NOT_AVAILABLE') {
+                message += '❌ Local chatbot not available\n';
+                message += '   → Check if chatbot.js is loaded\n';
+                message += '   → Verify module imports are working\n\n';
+            } else if (testResults.chatbot === 'PASSED') {
+                message += '✅ Local chatbot works!\n';
+                message += '   → Offline mode should be functional\n\n';
+            }
+            
+            // Check configuration
+            if (isGitHubPages && window.onlineApiConfigured !== false) {
+                message += '⚠️ Online API is enabled on GitHub Pages\n';
+                message += '   → Fix: Set onlineApiConfigured = false in your code\n';
+                message += '   → Or: Deploy backend and update API URLs\n\n';
+            }
+            
+            // Summary
+            if (isGitHubPages) {
+                message += '📋 SUMMARY FOR GITHUB PAGES:\n';
+                message += '   1. Set onlineApiConfigured = false\n';
+                message += '   2. Use local chatbot for all responses\n';
+                message += '   3. Update static asset paths to be relative\n';
+                message += '   4. Add <base href="/SXWer_AI-ChatBot/">\n';
+            }
+            
+            showResult('fixes-result', message, 'info');
+        }
+
+        // Step 7: Generate Summary
+        function generateSummary() {
+            let passed = 0;
+            let failed = 0;
+            let warnings = 0;
+            
+            for (const key in testResults) {
+                if (testResults[key] === 'PASSED') passed++;
+                else if (testResults[key] === 'FAILED') failed++;
+                else if (testResults[key] === 'WARNING') warnings++;
+            }
+            
+            const total = Object.keys(testResults).length;
+            const percentage = Math.round((passed / total) * 100);
+            
+            let message = `Test Summary:\n\n`;
+            message += `📊 Overall: ${passed}/${total} tests passed (${percentage}%)\n`;
+            message += `✅ Passed: ${passed}\n`;
+            message += `❌ Failed: ${failed}\n`;
+            message += `⚠️ Warnings: ${warnings}\n\n`;
+            
+            // Determine overall status
+            const isGitHubPages = window.location.hostname.includes('github.io');
+            if (isGitHubPages) {
+                if (failed === 0 || (failed === 1 && testResults.api === 'FAILED')) {
+                    message += '🎯 STATUS: Offline mode should work!\n';
+                    message += '   The API failures are expected on GitHub Pages.\n';
+                    message += '   Enable offline mode to fix the chatbot.';
+                } else {
+                    message += '🚨 STATUS: Multiple issues detected\n';
+                    message += '   Review the recommended fixes above.';
+                }
+            } else {
+                if (failed === 0) {
+                    message += '🎯 STATUS: All tests passed!\n';
+                    message += '   Your chatbot should be working correctly.';
+                } else {
+                    message += '🚨 STATUS: Issues detected\n';
+                    message += '   Review the recommended fixes above.';
+                }
+            }
+            
+            showResult('summary-result', message, failed === 0 ? 'success' : 'warning');
+        }
+
+        // Run all tests automatically on page load
+        window.addEventListener('DOMContentLoaded', async () => {
+            document.getElementById('test-status').textContent = 'Running tests...';
+            
+            // Run tests sequentially
+            await testBasicConnectivity();
+            await testApiEndpoints();
+            await testStaticAssets();
+            await testConfiguration();
+            
+            // Generate fixes and summary
+            generateFixes();
+            generateSummary();
+            
+            document.getElementById('test-status').textContent = 'Tests complete';
+        });
+
+        // Add event listeners for manual testing
+        document.addEventListener('DOMContentLoaded', () => {
+            // Add enter key support for test message
+            document.getElementById('test-message').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    testChatbot();
+                }
+            });
+        });
+    </script>
+</body>
+</html>

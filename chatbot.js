@@ -1223,6 +1223,213 @@ export {
 };
 
 // ============================================================================
+// SECTION 9: AUDIO SERVICE INTEGRATION (Mistral TTS & STT)
+// ============================================================================
+
+/**
+ * Audio Service Integration
+ * Provides Text-to-Speech (TTS) and Speech-to-Text (STT) functionality
+ * with explicit consent management and privacy protections.
+ *
+ * ETHICAL COMPLIANCE:
+ * - GDPR Article 5: Data minimization (audio processed ephemerally)
+ * - GDPR Article 7: Explicit consent required for audio processing
+ * - Belmont Report: Respect for Persons (user controls audio features)
+ * - Privacy by Design: No audio stored without consent
+ * - Sex Worker-Specific: No audio logging, ephemeral processing
+ */
+
+// Lazy import audio service to avoid circular dependencies
+let mistralAudioService = null;
+
+async function getAudioService() {
+  if (!mistralAudioService) {
+    try {
+      const module = await import('./services/audio/MistralAudioService.js');
+      mistralAudioService = new module.MistralAudioService();
+    } catch (error) {
+      console.warn('[Audio] Failed to load audio service:', error.message);
+      return null;
+    }
+  }
+  return mistralAudioService;
+}
+
+/**
+ * Text-to-Speech: Convert text to speech
+ * @param {string} text - Text to synthesize
+ * @param {Object} options - Options
+ * @param {string} options.sessionId - Session identifier
+ * @param {string} options.voiceId - Voice ID (default: en_esme_neutral)
+ * @param {string} options.responseFormat - Audio format (default: mp3)
+ * @returns {Promise<Object>} TTS result with audio data
+ */
+async function textToSpeech(text, options = {}) {
+  const audioService = await getAudioService();
+  if (!audioService) {
+    return { error: 'Audio service not available' };
+  }
+
+  const sessionId = options.sessionId || 'default';
+  
+  // Check consent
+  if (!audioService.hasConsent(sessionId, 'tts')) {
+    return { 
+      error: 'Audio consent required. Type /audio-consent on to enable.',
+      consentRequired: true 
+    };
+  }
+
+  try {
+    const result = await audioService.textToSpeech(text, {
+      sessionId,
+      voiceId: options.voiceId || 'en_esme_neutral',
+      responseFormat: options.responseFormat || 'mp3'
+    });
+    return result;
+  } catch (error) {
+    console.error('[Audio] TTS Error:', error.message);
+    return { error: error.message };
+  }
+}
+
+/**
+ * Speech-to-Text: Transcribe audio to text
+ * @param {string|Buffer|File|Blob} audio - Audio to transcribe
+ * @param {Object} options - Options
+ * @param {string} options.sessionId - Session identifier
+ * @param {boolean} options.diarize - Enable speaker diarization
+ * @param {Array} options.timestampGranularities - Timestamp precision
+ * @returns {Promise<Object>} STT result with transcription
+ */
+async function speechToText(audio, options = {}) {
+  const audioService = await getAudioService();
+  if (!audioService) {
+    return { error: 'Audio service not available' };
+  }
+
+  const sessionId = options.sessionId || 'default';
+  
+  // Check consent
+  if (!audioService.hasConsent(sessionId, 'stt')) {
+    return { 
+      error: 'Audio consent required. Type /audio-consent on to enable.',
+      consentRequired: true 
+    };
+  }
+
+  try {
+    const result = await audioService.speechToText(audio, {
+      sessionId,
+      diarize: options.diarize || false,
+      timestampGranularities: options.timestampGranularities || []
+    });
+    return result;
+  } catch (error) {
+    console.error('[Audio] STT Error:', error.message);
+    return { error: error.message };
+  }
+}
+
+/**
+ * Grant audio consent for a session
+ * @param {string} sessionId - Session identifier
+ * @param {string} type - 'tts', 'stt', or 'audio' (both)
+ * @returns {Object} Success status
+ */
+async function grantAudioConsent(sessionId = 'default', type = 'audio') {
+  const audioService = await getAudioService();
+  if (!audioService) {
+    return { success: false, error: 'Audio service not available' };
+  }
+  
+  audioService.grantConsent(sessionId, type);
+  return { success: true };
+}
+
+/**
+ * Revoke audio consent for a session
+ * @param {string} sessionId - Session identifier
+ * @param {string} type - 'tts', 'stt', or 'audio' (both)
+ * @returns {Object} Success status
+ */
+async function revokeAudioConsent(sessionId = 'default', type = 'audio') {
+  const audioService = await getAudioService();
+  if (!audioService) {
+    return { success: false, error: 'Audio service not available' };
+  }
+  
+  audioService.revokeConsent(sessionId, type);
+  return { success: true };
+}
+
+/**
+ * Get audio consent state for a session
+ * @param {string} sessionId - Session identifier
+ * @returns {Object} Consent state
+ */
+async function getAudioConsentState(sessionId = 'default') {
+  const audioService = await getAudioService();
+  if (!audioService) {
+    return { tts: false, stt: false };
+  }
+  
+  return audioService.getConsentState(sessionId);
+}
+
+/**
+ * Get audio service status
+ * @returns {Object} Service status
+ */
+async function getAudioStatus() {
+  const audioService = await getAudioService();
+  if (!audioService) {
+    return {
+      apiKeyConfigured: false,
+      ttsRateLimit: { remaining: 0, limit: 0 },
+      sttRateLimit: { remaining: 0, limit: 0 },
+      activeSessions: 0
+    };
+  }
+  
+  return audioService.getStatus();
+}
+
+/**
+ * Get available TTS voices
+ * @returns {Object} Available voices
+ */
+async function getAvailableVoices() {
+  const audioService = await getAudioService();
+  if (!audioService) {
+    return {};
+  }
+  
+  return audioService.getAvailableVoices();
+}
+
+// Export audio functions
+export {
+  textToSpeech,
+  speechToText,
+  grantAudioConsent,
+  revokeAudioConsent,
+  getAudioConsentState,
+  getAudioStatus,
+  getAvailableVoices,
+  getAudioService,
+};
+
+// Update the main chatbot instance to include audio methods
+chatbot.textToSpeech = textToSpeech;
+chatbot.speechToText = speechToText;
+chatbot.grantAudioConsent = grantAudioConsent;
+chatbot.revokeAudioConsent = revokeAudioConsent;
+chatbot.getAudioConsentState = getAudioConsentState;
+chatbot.getAudioStatus = getAudioStatus;
+chatbot.getAvailableVoices = getAvailableVoices;
+
+// ============================================================================
 // SECTION 8: REQUIREMENT VERIFICATION MARKERS
 // ============================================================================
 

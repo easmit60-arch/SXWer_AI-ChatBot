@@ -317,6 +317,107 @@
         color: var(--white);
       }
 
+      /* Audio Section Styles */
+      .audio-section {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid var(--silver);
+        background: linear-gradient(
+          135deg,
+          rgba(0, 212, 255, 0.05),
+          rgba(255, 0, 102, 0.05)
+        );
+        border-radius: 8px;
+        padding: 15px;
+      }
+
+      .audio-section label {
+        display: block;
+        font-size: 12px;
+        color: var(--neon-cyan);
+        margin-bottom: 8px;
+        font-weight: 600;
+      }
+
+      .audio-controls {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .audio-input-group {
+        display: flex;
+        gap: 10px;
+        flex: 1;
+        min-width: 200px;
+      }
+
+      .audio-upload-group {
+        display: flex;
+        gap: 10px;
+      }
+
+      .audio-input-group input,
+      .audio-upload-group input {
+        flex: 1;
+        padding: 10px;
+        border: 1px solid var(--silver);
+        border-radius: var(--radius);
+        font-family: inherit;
+        font-size: 13px;
+      }
+
+      .audio-input-group input:focus,
+      .audio-upload-group input:focus {
+        outline: none;
+        border-color: var(--neon-cyan);
+        box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1);
+      }
+
+      .audio-controls button {
+        padding: 10px 16px;
+        border: none;
+        border-radius: var(--radius);
+        font-family: inherit;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .audio-controls button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      #tts-btn {
+        background: linear-gradient(135deg, var(--neon-cyan), var(--pink));
+        color: var(--white);
+      }
+
+      #stt-btn {
+        background: linear-gradient(135deg, var(--purple), var(--neon-cyan));
+        color: var(--white);
+      }
+
+      #audio-consent-btn {
+        background: linear-gradient(135deg, var(--pink), var(--purple));
+        color: var(--white);
+      }
+
+      .audio-disclaimer {
+        font-size: 11px;
+        color: var(--gray);
+        margin-top: 8px;
+        line-height: 1.4;
+      }
+
+      .audio-status {
+        font-size: 11px;
+        color: var(--ink-soft);
+        margin-top: 8px;
+        min-height: 16px;
+      }
+
       .sherlock-input-group button:hover:not(:disabled) {
         box-shadow: 0 5px 15px rgba(255, 0, 102, 0.4);
       }
@@ -1070,6 +1171,39 @@
             </p>
           </div>
 
+          <!-- AUDIO SECTION - Mistral TTS & STT with Privacy Protections -->
+          <div class="audio-section">
+            <label> Audio - Text-to-Speech & Speech-to-Text</label>
+            <div class="audio-controls">
+              <div class="audio-input-group">
+                <input
+                  type="text"
+                  id="tts-input"
+                  placeholder="Enter text to convert to speech"
+                  autocomplete="off"
+                  aria-label="Text to speech input"
+                />
+                <button id="tts-btn" title="Text to Speech (Ctrl+Shift+T)">🔊 TTS</button>
+              </div>
+              <div class="audio-upload-group">
+                <input
+                  type="file"
+                  id="stt-upload"
+                  accept="audio/*"
+                  style="display: none;"
+                  aria-label="Audio file upload"
+                />
+                <button id="stt-btn" title="Speech to Text (Ctrl+Shift+S)">🎤 STT</button>
+              </div>
+              <button id="audio-consent-btn" title="Toggle Audio Consent">🎙️ Consent</button>
+            </div>
+            <p class="audio-disclaimer">
+              <strong>🔒 Privacy Protected:</strong> Audio processing requires explicit consent.
+              No audio is stored or logged. All processing is ephemeral.
+            </p>
+            <div id="audio-status" class="audio-status"></div>
+          </div>
+
           <div
             id="status"
             class="status"
@@ -1188,6 +1322,12 @@
         </li>
         <li><code>/consent yes</code> - Grant AI consent</li>
         <li><code>/consent no</code> - Revoke AI consent</li>
+        <li><code>/audio-consent on</code> - Grant audio processing consent</li>
+        <li><code>/audio-consent off</code> - Revoke audio processing consent</li>
+        <li><code>/tts &lt;text&gt;</code> - Convert text to speech (requires audio consent)</li>
+        <li><code>/stt</code> - Transcribe audio file (requires audio consent)</li>
+        <li><code>/voices</code> - List available TTS voices</li>
+        <li><code>/audio-status</code> - Check audio service status</li>
         <li><code>/help</code> - Show this help</li>
       </ul>
       <button id="command-help-close" type="button">Close</button>
@@ -1313,6 +1453,13 @@
       const commandHelp = document.getElementById("command-help");
       const sherlockInput = document.getElementById("sherlock-input");
       const sherlockBtn = document.getElementById("sherlock-btn");
+      // Audio elements
+      const ttsInput = document.getElementById("tts-input");
+      const ttsBtn = document.getElementById("tts-btn");
+      const sttUpload = document.getElementById("stt-upload");
+      const sttBtn = document.getElementById("stt-btn");
+      const audioConsentBtn = document.getElementById("audio-consent-btn");
+      const audioStatusEl = document.getElementById("audio-status");
       const mistralDisclosureOverlay = document.getElementById(
         "mistral-disclosure-overlay",
       );
@@ -1890,6 +2037,200 @@
               "Would you like to keep chatting here, or retry after the API is available again?",
           });
 
+          return {
+            response: assistant.formatResponseForDisplay(response),
+            offline: true,
+            browserFallback: true,
+            fallbackReason: reason,
+          };
+        }
+
+        // Audio commands
+        if (messageText.startsWith("/tts ")) {
+          const text = messageText.substring(5).trim();
+          if (!text) {
+            const response = assistant.formatHumanNLP({
+              userInput: messageText,
+              anchor: "Text-to-Speech command",
+              mirror: `You asked: "${messageText}"`,
+              reframe: "Please provide text to convert to speech. Example: /tts Hello world",
+              rapport: "What would you like me to say?",
+            });
+            return {
+              response: assistant.formatResponseForDisplay(response),
+              offline: true,
+              browserFallback: true,
+              fallbackReason: reason,
+            };
+          }
+          
+          // Check audio consent
+          const audioConsent = assistant.chatbot.getAudioConsentState(sessionId);
+          if (!audioConsent.tts) {
+            const response = assistant.formatHumanNLP({
+              userInput: messageText,
+              anchor: "Audio consent required",
+              mirror: `You asked: "${messageText}"`,
+              reframe: "Text-to-Speech requires audio consent. Type /audio-consent on to enable.",
+              rapport: "Would you like to grant audio consent?",
+            });
+            return {
+              response: assistant.formatResponseForDisplay(response),
+              offline: true,
+              browserFallback: true,
+              fallbackReason: reason,
+            };
+          }
+          
+          // Generate speech
+          try {
+            const result = await assistant.chatbot.textToSpeech(text, { sessionId });
+            if (result.error) {
+              const response = assistant.formatHumanNLP({
+                userInput: messageText,
+                anchor: "TTS Error",
+                mirror: `You asked: "${messageText}"`,
+                reframe: `Error: ${result.error}`,
+                rapport: "Please try again or check your audio settings.",
+              });
+              return {
+                response: assistant.formatResponseForDisplay(response),
+                offline: true,
+                browserFallback: true,
+                fallbackReason: reason,
+              };
+            }
+            
+            // Create audio element
+            const audio = new Audio(`data:audio/mp3;base64,${result.audioData}`);
+            audio.play();
+            
+            const response = assistant.formatHumanNLP({
+              userInput: messageText,
+              anchor: "Playing audio",
+              mirror: `You asked: "${messageText}"`,
+              reframe: `Playing: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`,
+              rapport: "How does that sound?",
+            });
+            return {
+              response: assistant.formatResponseForDisplay(response),
+              offline: true,
+              browserFallback: true,
+              fallbackReason: reason,
+            };
+          } catch (error) {
+            const response = assistant.formatHumanNLP({
+              userInput: messageText,
+              anchor: "TTS Error",
+              mirror: `You asked: "${messageText}"`,
+              reframe: `Error: ${error.message}`,
+              rapport: "Please try again or check your audio settings.",
+            });
+            return {
+              response: assistant.formatResponseForDisplay(response),
+              offline: true,
+              browserFallback: true,
+              fallbackReason: reason,
+            };
+          }
+        }
+
+        if (messageText === "/stt") {
+          // Check audio consent
+          const audioConsent = assistant.chatbot.getAudioConsentState(sessionId);
+          if (!audioConsent.stt) {
+            const response = assistant.formatHumanNLP({
+              userInput: messageText,
+              anchor: "Audio consent required",
+              mirror: `You asked: "${messageText}"`,
+              reframe: "Speech-to-Text requires audio consent. Type /audio-consent on to enable.",
+              rapport: "Would you like to grant audio consent?",
+            });
+            return {
+              response: assistant.formatResponseForDisplay(response),
+              offline: true,
+              browserFallback: true,
+              fallbackReason: reason,
+            };
+          }
+          
+          const response = assistant.formatHumanNLP({
+            userInput: messageText,
+            anchor: "Audio upload",
+            mirror: `You asked: "${messageText}"`,
+            reframe: "Please select an audio file to transcribe.",
+            rapport: "Click the STT button or use the file upload.",
+          });
+          return {
+            response: assistant.formatResponseForDisplay(response),
+            offline: true,
+            browserFallback: true,
+            fallbackReason: reason,
+          };
+        }
+
+        if (messageText === "/audio-consent on") {
+          const result = await assistant.chatbot.grantAudioConsent(sessionId, 'audio');
+          const response = assistant.formatHumanNLP({
+            userInput: messageText,
+            anchor: "Audio consent granted",
+            mirror: `You asked: "${messageText}"`,
+            reframe: result.success ? "Audio consent granted. You can now use /tts and /stt commands." : "Failed to grant audio consent.",
+            rapport: "Try /tts or /stt to test audio features.",
+          });
+          return {
+            response: assistant.formatResponseForDisplay(response),
+            offline: true,
+            browserFallback: true,
+            fallbackReason: reason,
+          };
+        }
+
+        if (messageText === "/audio-consent off") {
+          const result = await assistant.chatbot.revokeAudioConsent(sessionId, 'audio');
+          const response = assistant.formatHumanNLP({
+            userInput: messageText,
+            anchor: "Audio consent revoked",
+            mirror: `You asked: "${messageText}"`,
+            reframe: result.success ? "Audio consent revoked. /tts and /stt commands are now disabled." : "Failed to revoke audio consent.",
+            rapport: "Type /audio-consent on to re-enable audio features.",
+          });
+          return {
+            response: assistant.formatResponseForDisplay(response),
+            offline: true,
+            browserFallback: true,
+            fallbackReason: reason,
+          };
+        }
+
+        if (messageText === "/audio-status") {
+          const status = await assistant.chatbot.getAudioStatus();
+          const consent = await assistant.chatbot.getAudioConsentState(sessionId);
+          const response = assistant.formatHumanNLP({
+            userInput: messageText,
+            anchor: "Audio service status",
+            mirror: `You asked: "${messageText}"`,
+            reframe: `Audio Service Status:\n\nAPI Key: ${status.apiKeyConfigured ? 'Configured' : 'Not configured'}\nTTS Rate Limit: ${status.ttsRateLimit.remaining}/${status.ttsRateLimit.limit}\nSTT Rate Limit: ${status.sttRateLimit.remaining}/${status.sttRateLimit.limit}\nConsent: TTS=${consent.tts ? 'Yes' : 'No'}, STT=${consent.stt ? 'Yes' : 'No'}`,
+            rapport: "Type /audio-consent on to enable audio features.",
+          });
+          return {
+            response: assistant.formatResponseForDisplay(response),
+            offline: true,
+            browserFallback: true,
+            fallbackReason: reason,
+          };
+        }
+
+        if (messageText === "/voices") {
+          const voices = await assistant.chatbot.getAvailableVoices();
+          const voiceList = Object.entries(voices).map(([id, name]) => `- ${id}: ${name}`).join('\\n');
+          const response = assistant.formatHumanNLP({
+            userInput: messageText,
+            anchor: "Available TTS voices",
+            mirror: `You asked: "${messageText}"`,
+            reframe: `Available TTS Voices:\\n\\n${voiceList}`,
+            rapport: "Use /tts "text" --voice VOICE_ID to specify a voice.",
+          });
           return {
             response: assistant.formatResponseForDisplay(response),
             offline: true,
@@ -2476,6 +2817,119 @@
         }
       });
 
+      // Audio controls - Text-to-Speech
+      ttsBtn?.addEventListener("click", async () => {
+        if (!ttsInput) return;
+        const text = ttsInput.value.trim();
+        if (!text) {
+          setStatus("Please enter text for TTS");
+          return;
+        }
+        
+        try {
+          const result = await window.__sxwerLocalAssistant.chatbot.textToSpeech(text, {
+            sessionId
+          });
+          
+          if (result.error) {
+            if (result.consentRequired) {
+              setStatus("Audio consent required. Type /audio-consent on");
+            } else {
+              setStatus(`TTS Error: ${result.error}`);
+            }
+            return;
+          }
+          
+          // Create audio element and play
+          const audio = new Audio(`data:audio/mp3;base64,${result.audioData}`);
+          audio.play();
+          
+          // Clear input
+          ttsInput.value = "";
+          setStatus("Playing audio...");
+          
+          // Reset status when audio ends
+          audio.addEventListener("ended", () => {
+            setStatus("Ready");
+          });
+          
+        } catch (error) {
+          setStatus(`TTS Error: ${error.message}`);
+          console.error("[Audio] TTS Error:", error);
+        }
+      });
+
+      // TTS input - Enter key
+      ttsInput?.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          ttsBtn?.click();
+        }
+      });
+
+      // Audio controls - Speech-to-Text
+      sttBtn?.addEventListener("click", () => {
+        sttUpload?.click();
+      });
+
+      // STT file upload handler
+      sttUpload?.addEventListener("change", async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        try {
+          setStatus("Transcribing audio...");
+          
+          const result = await window.__sxwerLocalAssistant.chatbot.speechToText(file, {
+            sessionId
+          });
+          
+          if (result.error) {
+            if (result.consentRequired) {
+              setStatus("Audio consent required. Type /audio-consent on");
+            } else {
+              setStatus(`STT Error: ${result.error}`);
+            }
+            return;
+          }
+          
+          // Display transcription
+          appendMessage("user", `[Audio: ${file.name}]`, false, false, false);
+          appendMessage("assistant", `🎤 Transcription:\n\n${result.text}`, false, false, false);
+          setStatus("Ready");
+          
+        } catch (error) {
+          setStatus(`STT Error: ${error.message}`);
+          console.error("[Audio] STT Error:", error);
+        }
+        
+        // Reset file input
+        e.target.value = "";
+      });
+
+      // Audio consent button
+      audioConsentBtn?.addEventListener("click", async () => {
+        try {
+          const consent = await window.__sxwerLocalAssistant.chatbot.getAudioConsentState(sessionId);
+          
+          if (consent.tts && consent.stt) {
+            // Revoke consent
+            await window.__sxwerLocalAssistant.chatbot.revokeAudioConsent(sessionId, 'audio');
+            setStatus("Audio consent revoked");
+          } else {
+            // Grant consent
+            await window.__sxwerLocalAssistant.chatbot.grantAudioConsent(sessionId, 'audio');
+            setStatus("Audio consent granted");
+          }
+          
+          updateAudioStatus();
+          
+        } catch (error) {
+          setStatus(`Consent Error: ${error.message}`);
+          console.error("[Audio] Consent Error:", error);
+        }
+      });
+
       // Hide help panels when clicking outside
       document.addEventListener("click", (e) => {
         if (
@@ -2503,8 +2957,66 @@
         }
       });
 
+      // Audio status update function
+      async function updateAudioStatus() {
+        if (!audioStatusEl) return;
+        
+        try {
+          const status = await window.__sxwerLocalAssistant.chatbot.getAudioStatus();
+          const consent = await window.__sxwerLocalAssistant.chatbot.getAudioConsentState(sessionId);
+          
+          const parts = [];
+          
+          if (!status.apiKeyConfigured) {
+            parts.push('API Key not set');
+          } else {
+            parts.push(`TTS: ${status.ttsRateLimit.remaining}/${status.ttsRateLimit.limit}`);
+            parts.push(`STT: ${status.sttRateLimit.remaining}/${status.sttRateLimit.limit}`);
+          }
+          
+          parts.push(`Consent: TTS=${consent.tts ? 'Yes' : 'No'}, STT=${consent.stt ? 'Yes' : 'No'}`);
+          
+          audioStatusEl.textContent = `Audio: ${parts.join(' | ')}`;
+          
+          // Update button states
+          if (ttsBtn) {
+            ttsBtn.disabled = !status.apiKeyConfigured || !consent.tts;
+            ttsBtn.style.opacity = ttsBtn.disabled ? '0.5' : '1';
+          }
+          
+          if (sttBtn) {
+            sttBtn.disabled = !status.apiKeyConfigured || !consent.stt;
+            sttBtn.style.opacity = sttBtn.disabled ? '0.5' : '1';
+          }
+          
+        } catch (error) {
+          console.error('[Audio] Status update error:', error);
+          if (audioStatusEl) {
+            audioStatusEl.textContent = 'Audio: Error loading status';
+          }
+        }
+      }
+
       // Initialize on load
       window.addEventListener("load", init);
+      
+      // Update audio status periodically
+      setInterval(updateAudioStatus, 30000);
+      
+      // Also update when consent changes
+      const originalGrantConsent = window.__sxwerLocalAssistant.chatbot.grantAudioConsent;
+      window.__sxwerLocalAssistant.chatbot.grantAudioConsent = async function(...args) {
+        const result = await originalGrantConsent.apply(this, args);
+        updateAudioStatus();
+        return result;
+      };
+      
+      const originalRevokeConsent = window.__sxwerLocalAssistant.chatbot.revokeAudioConsent;
+      window.__sxwerLocalAssistant.chatbot.revokeAudioConsent = async function(...args) {
+        const result = await originalRevokeConsent.apply(this, args);
+        updateAudioStatus();
+        return result;
+      };
     </script>
   </body>
 </html>
