@@ -24,6 +24,12 @@
  */
 
 import crypto from 'crypto';
+import {
+  generateAnonymousSessionId,
+  isValidSessionId,
+  normalizeSessionId,
+  MAX_SESSION_ID_LENGTH,
+} from './utils.js';
 
 // ============================================================================
 // 1. DATA MINIMIZATION IN CONSENT STORAGE
@@ -35,37 +41,8 @@ import crypto from 'crypto';
  */
 const SESSION_TTL = 24 * 60 * 60 * 1000;
 
-/**
- * Generate cryptographically secure, anonymous session ID
- * - No user-identifiable information
- * - Fixed length for data minimization
- * @returns {string} Anonymous session ID
- */
-function generateAnonymousSessionId() {
-  return crypto.randomBytes(32).toString('hex').substring(0, 64);
-}
-
-/**
- * Validate session ID for data minimization compliance
- * @param {string} sessionId - Session ID to validate
- * @returns {boolean} True if valid
- */
-function isValidSessionId(sessionId) {
-  if (typeof sessionId !== 'string') return false;
-  if (sessionId.length === 0 || sessionId.length > 64) return false;
-  return /^[a-f0-9]+$/.test(sessionId); // Hex only for anonymity
-}
-
-/**
- * Normalize session ID with data minimization
- * @param {string} sessionId - Session ID to normalize
- * @returns {string} Normalized anonymous session ID
- */
-function normalizeSessionId(sessionId = null) {
-  if (!sessionId) return generateAnonymousSessionId();
-  const normalized = String(sessionId).trim();
-  return isValidSessionId(normalized) ? normalized : generateAnonymousSessionId();
-}
+// Use shared session ID utilities from utils.js
+// All duplicate functions have been removed and centralized in utils.js
 
 // ============================================================================
 // 2. RIGHT TO EXPLANATION (GDPR Article 22, AI Ethics Lab)

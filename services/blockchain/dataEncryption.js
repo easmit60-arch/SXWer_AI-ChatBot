@@ -145,7 +145,7 @@ function encryptSymmetric(data, key) {
     throw new TypeError(`[ENCRYPTION] Key must be a ${ENCRYPTION_CONFIG.symmetricKeySize}-byte Uint8Array.`);
   }
 
-  const dataBytes = typeof data === 'string' ? encodeUTF8(data) : data;
+  const dataBytes = typeof data === 'string' ? new TextEncoder().encode(data) : data;
   const nonce = nacl.randomBytes(ENCRYPTION_CONFIG.nonceSize);
   
   const ciphertext = nacl.secretbox(dataBytes, nonce, key);
@@ -206,7 +206,7 @@ function decryptSymmetric(encrypted, key) {
  * @returns {Object} Encrypted data
  */
 function encryptStringSymmetric(data, key) {
-  const encrypted = encryptSymmetric(encodeUTF8(data), key);
+  const encrypted = encryptSymmetric(new TextEncoder().encode(data), key);
   return encrypted;
 }
 
@@ -219,7 +219,7 @@ function encryptStringSymmetric(data, key) {
  */
 function decryptStringSymmetric(encrypted, key) {
   const decrypted = decryptSymmetric(encrypted, key);
-  return decodeUTF8(decrypted);
+  return new TextDecoder().decode(decrypted);
 }
 
 // ============================================================================
@@ -506,7 +506,7 @@ function decryptNGOEncryptionPackage(encryptedPackage, recipientId, recipientSec
     recipientSecretKey
   );
   
-  const decryptedString = decodeUTF8(decryptedBytes);
+  const decryptedString = new TextDecoder().decode(decryptedBytes);
   
   try {
     return JSON.parse(decryptedString);
